@@ -1,0 +1,2101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChargeSmart — EV Charging Savings Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* =============================================
+   EDITABLE ASSUMPTIONS
+   ============================================= */
+:root {
+  /* EV Rates ($/kWh) */
+  --rate-offpeak: 0.09;
+  --rate-peak:    0.20;
+  --rate-base:    0.13;
+
+  /* EV defaults */
+  --efficiency-default: 3.2;
+  --miles-default:      1000;
+  --monthly-credit:     4.00;
+
+  /* Behavior splits (% off-peak) */
+  --split-optimal:   1.00;
+  --split-optimized: 0.85;
+  --split-mixed:     0.50;
+  --split-poor:      0.25;
+
+  /* Household offset estimates ($/month each) */
+  --offset-dishwasher: 4;
+  --offset-laundry:    7;
+  --offset-thermostat: 9;
+  --offset-water:      5;
+
+  /* =============================================
+     Design tokens — light theme
+     ============================================= */
+  --page-bg:    #F1F5F9;
+  --surface:    #FFFFFF;
+  --surface-2:  #F8FAFC;
+  --surface-3:  #F1F5F9;
+
+  --navy:       #0F2447;
+  --navy-mid:   #1A3A6B;
+  --navy-light: #EEF2FF;
+
+  --blue:       #2563EB;
+  --blue-light: #DBEAFE;
+  --blue-mid:   #93C5FD;
+  --blue-dark:  #1D4ED8;
+
+  --green:      #16A34A;
+  --green-light:#DCFCE7;
+  --green-dark: #14532D;
+  --green-mid:  #86EFAC;
+
+  --teal:       #0D9488;
+  --teal-light: #CCFBF1;
+
+  --amber:      #D97706;
+  --amber-light:#FEF3C7;
+  --amber-dark: #78350F;
+
+  --orange:     #EA580C;
+  --orange-light:#FFF7ED;
+
+  --red:        #DC2626;
+  --red-light:  #FEE2E2;
+  --red-dark:   #991B1B;
+
+  --slate-50:   #F8FAFC;
+  --slate-100:  #F1F5F9;
+  --slate-200:  #E2E8F0;
+  --slate-300:  #CBD5E1;
+  --slate-400:  #94A3B8;
+  --slate-500:  #64748B;
+  --slate-600:  #475569;
+  --slate-700:  #334155;
+  --slate-800:  #1E293B;
+  --slate-900:  #0F172A;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --font:      'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 2px 8px rgba(0,0,0,0.04);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.08), 0 6px 20px rgba(0,0,0,0.05);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--page-bg);
+  color: var(--slate-800);
+  line-height: 1.6;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { line-height: 1.2; font-weight: 600; color: var(--slate-900); }
+h1 { font-size: clamp(1.7rem, 4vw, 2.5rem); }
+h2 { font-size: clamp(1.4rem, 3vw, 1.9rem); }
+h3 { font-size: 1rem; font-weight: 600; }
+p  { line-height: 1.7; }
+
+.container { max-width: 980px; margin: 0 auto; padding: 0 1.5rem; }
+
+section { padding: 4.5rem 0; }
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--slate-200);
+}
+
+.card-sm {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow-xs);
+  border: 1px solid var(--slate-200);
+}
+
+.divider { height: 1px; background: var(--slate-100); margin: 1.25rem 0; }
+
+.section-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--slate-400);
+  margin-bottom: 0.55rem;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 100px;
+  letter-spacing: 0.02em;
+}
+.badge-blue   { background: var(--blue-light);   color: var(--blue-dark); }
+.badge-green  { background: var(--green-light);  color: var(--green-dark); }
+.badge-amber  { background: var(--amber-light);  color: var(--amber-dark); }
+.badge-orange { background: var(--orange-light); color: #9A3412; }
+.badge-red    { background: var(--red-light);    color: var(--red-dark); }
+.badge-teal   { background: var(--teal-light);   color: #115E59; }
+.badge-navy   { background: var(--navy-light);   color: var(--navy-mid); }
+
+/* ── Progress bar ── */
+.progress-bar {
+  position: fixed; top: 0; left: 0;
+  height: 2px; background: var(--green);
+  z-index: 300; transition: width 0.1s; width: 0%;
+}
+
+/* ── Screens ── */
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* =============================================
+   NAV
+   ============================================= */
+.site-nav {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 200;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--slate-200);
+  box-shadow: var(--shadow-xs);
+}
+.nav-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 980px; margin: 0 auto; padding: 0.8rem 1.5rem;
+}
+.nav-logo {
+  font-weight: 600; font-size: 0.95rem; color: var(--navy);
+  text-decoration: none; display: flex; align-items: center; gap: 8px;
+}
+.nav-logo-badge {
+  font-size: 0.65rem; font-weight: 600; padding: 2px 7px;
+  background: var(--navy-light); color: var(--navy-mid);
+  border-radius: 100px; letter-spacing: 0.06em;
+}
+.nav-links { display: flex; align-items: center; gap: 0.25rem; }
+.nav-tab {
+  font-size: 0.82rem; font-weight: 500; color: var(--slate-500);
+  padding: 0.4rem 0.85rem; border-radius: var(--radius-md);
+  border: none; background: none; cursor: pointer;
+  font-family: var(--font); transition: color 0.15s, background 0.15s;
+  text-decoration: none;
+}
+.nav-tab:hover { color: var(--slate-800); background: var(--slate-100); }
+.nav-tab.active-tab { color: var(--blue); background: var(--blue-light); }
+.nav-cta {
+  font-size: 0.82rem; font-weight: 600; color: #fff;
+  background: var(--blue); padding: 0.42rem 1rem;
+  border-radius: var(--radius-sm); text-decoration: none;
+  transition: background 0.15s; border: none; cursor: pointer; font-family: var(--font);
+}
+.nav-cta:hover { background: var(--blue-dark); }
+@media (max-width: 600px) { .nav-links { display: none; } }
+
+/* =============================================
+   SCREEN 1 — CALCULATOR
+   ============================================= */
+
+/* ── Orient strip ── */
+#orient {
+  background: var(--surface);
+  border-bottom: 1px solid var(--slate-200);
+  padding: 7rem 0 2.5rem;
+  text-align: center;
+}
+.orient-inner { max-width: 580px; margin: 0 auto; padding: 0 1.5rem; }
+#orient h1 { color: var(--navy); font-weight: 300; letter-spacing: -0.02em; margin-bottom: 0.8rem; }
+#orient h1 strong { font-weight: 700; color: var(--blue); }
+.orient-sub {
+  color: var(--slate-500); font-size: 1rem; line-height: 1.65; margin: 0 auto;
+}
+.orient-sub strong { color: var(--slate-700); }
+
+/* ── Calculator section ── */
+#calculator { background: var(--page-bg); padding: 3rem 0 4rem; }
+
+.calc-layout {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 1.5rem; align-items: start;
+}
+@media (max-width: 720px) { .calc-layout { grid-template-columns: 1fr; } }
+
+/* Inputs */
+.input-group { margin-bottom: 1.6rem; }
+.input-group:last-child { margin-bottom: 0; }
+.input-label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 0.7rem;
+}
+.input-label-text  { font-size: 0.87rem; font-weight: 500; color: var(--slate-700); }
+.input-label-value { font-size: 0.95rem; font-weight: 600; color: var(--navy); font-family: var(--font-mono); }
+
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 5px; border-radius: 100px;
+  background: var(--slate-200); outline: none; cursor: pointer; margin: 0.4rem 0;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 20px; height: 20px;
+  border-radius: 50%; background: var(--blue); cursor: pointer;
+  border: 3px solid #fff; box-shadow: 0 0 0 2px var(--blue);
+  transition: transform 0.1s;
+}
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+.range-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--slate-400); margin-top: 4px; }
+
+.behavior-selector { display: flex; flex-direction: column; gap: 0.5rem; }
+.behavior-option {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.8rem 1rem; border-radius: var(--radius-md);
+  border: 1.5px solid var(--slate-200); cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--surface);
+}
+.behavior-option:hover { border-color: var(--slate-300); background: var(--slate-50); }
+.behavior-option.sel-blue   { border-color: var(--blue);   background: #EFF6FF; }
+.behavior-option.sel-amber  { border-color: var(--amber);  background: #FFFBEB; }
+.behavior-option.sel-orange { border-color: var(--orange); background: var(--orange-light); }
+.behavior-dot {
+  width: 13px; height: 13px; border-radius: 50%;
+  border: 2px solid var(--slate-300); flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.behavior-option.sel-blue   .behavior-dot { background: var(--blue);   border-color: var(--blue); }
+.behavior-option.sel-amber  .behavior-dot { background: var(--amber);  border-color: var(--amber); }
+.behavior-option.sel-orange .behavior-dot { background: var(--orange); border-color: var(--orange); }
+.behavior-text { flex: 1; }
+.behavior-title    { font-size: 0.86rem; font-weight: 500; color: var(--slate-800); }
+.behavior-subtitle { font-size: 0.73rem; color: var(--slate-400); margin-top: 1px; }
+
+.advanced-toggle {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 0.8rem; color: var(--blue); font-weight: 500;
+  cursor: pointer; border: none; background: none;
+  padding: 0; font-family: var(--font); margin-top: 0.25rem;
+}
+.advanced-toggle svg { transition: transform 0.2s; }
+.advanced-toggle.open svg { transform: rotate(180deg); }
+.advanced-panel { margin-top: 1rem; display: none; }
+.advanced-panel.open { display: block; }
+.advanced-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.adv-field label { display: block; font-size: 0.76rem; color: var(--slate-600); margin-bottom: 0.3rem; font-weight: 500; }
+.adv-field input[type="number"] {
+  width: 100%; padding: 0.48rem 0.7rem;
+  border: 1.5px solid var(--slate-200); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 0.86rem;
+  color: var(--slate-800); background: var(--surface);
+  outline: none; transition: border-color 0.15s;
+}
+.adv-field input[type="number"]:focus { border-color: var(--blue); }
+
+/* Results card */
+.results-card {
+  background: var(--surface); border-radius: var(--radius-lg);
+  border: 1px solid var(--slate-200);
+  overflow: hidden; box-shadow: var(--shadow-md);
+  display: flex; flex-direction: column;
+}
+
+/* Grade banner */
+.grade-banner {
+  padding: 1.4rem 1.6rem 1.2rem;
+  border-bottom: 1px solid var(--slate-100);
+  display: flex; align-items: center; gap: 1.1rem;
+  transition: background 0.3s;
+}
+.grade-banner.gbg-A { background: #F0FDF4; }
+.grade-banner.gbg-B { background: #F0FDFA; }
+.grade-banner.gbg-C { background: #FFFBEB; }
+.grade-banner.gbg-D { background: #FEF2F2; }
+
+.grade-badge {
+  width: 60px; height: 60px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.9rem; font-weight: 700; font-family: var(--font-mono);
+  flex-shrink: 0; transition: background 0.3s, color 0.3s; letter-spacing: -0.03em;
+}
+.gb-A { background: var(--green-light);  color: var(--green-dark); }
+.gb-B { background: var(--teal-light);   color: #115E59; }
+.gb-C { background: var(--amber-light);  color: var(--amber-dark); }
+.gb-D { background: var(--red-light);    color: var(--red-dark); }
+
+.grade-info { flex: 1; }
+.grade-title    { font-size: 0.97rem; font-weight: 600; color: var(--slate-800); margin-bottom: 3px; }
+.grade-subtitle { font-size: 0.8rem;  color: var(--slate-500); line-height: 1.5; }
+.grade-nudge    { font-size: 0.75rem; font-style: italic; color: var(--slate-400); margin-top: 5px; }
+
+/* Breakdown */
+.results-body { padding: 1.1rem 1.6rem; flex: 1; }
+.result-line {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.55rem 0; border-bottom: 1px solid var(--slate-100);
+  font-size: 0.86rem;
+}
+.result-line:last-child { border-bottom: none; }
+.result-line-label { color: var(--slate-500); }
+.result-line-value { font-weight: 500; font-family: var(--font-mono); color: var(--slate-800); }
+.result-line-value.green { color: var(--green); }
+.result-line-value.blue  { color: var(--blue); }
+.result-line-value.red   { color: var(--red); }
+.result-line-value.amber { color: var(--amber); }
+
+/* Total block */
+.result-total {
+  background: var(--navy);
+  padding: 1.2rem 1.6rem;
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 1rem;
+}
+.result-total-label {
+  font-size: 0.68rem; color: #64748B; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px;
+}
+.result-total-value {
+  font-size: 2.4rem; font-weight: 600; color: #fff;
+  font-family: var(--font-mono); letter-spacing: -0.03em; line-height: 1;
+}
+.result-annual-label {
+  font-size: 0.68rem; color: #475569; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px;
+  text-align: right;
+}
+.result-annual-value {
+  font-size: 1.15rem; font-weight: 600; color: #94A3B8;
+  font-family: var(--font-mono); text-align: right;
+}
+.result-savings-line {
+  font-size: 0.75rem; color: #475569; margin-top: 5px;
+  transition: color 0.3s;
+}
+.result-savings-line.positive { color: #4ADE80; }
+.result-savings-line.negative { color: #F87171; }
+
+/* Inline CTA */
+.inline-cta {
+  padding: 1.1rem 1.6rem;
+  border-top: 1px solid var(--slate-100);
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  background: var(--surface-2);
+}
+.inline-cta-text { font-size: 0.82rem; color: var(--slate-600); flex: 1; min-width: 170px; line-height: 1.5; }
+.inline-cta-text strong { color: var(--slate-800); }
+.btn-inline-cta {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--green); color: #fff; font-family: var(--font);
+  font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem;
+  border: none; border-radius: var(--radius-md); cursor: pointer;
+  text-decoration: none; transition: background 0.15s; white-space: nowrap; flex-shrink: 0;
+}
+.btn-inline-cta:hover { background: #15803D; }
+
+/* Optimal ceiling callout */
+.optimal-callout {
+  margin-top: 1.25rem;
+  background: var(--surface);
+  border: 1.5px solid var(--green-mid);
+  border-radius: var(--radius-lg);
+  padding: 1.2rem 1.6rem;
+  display: flex; align-items: center; gap: 1.25rem;
+  box-shadow: var(--shadow-xs);
+}
+.optimal-star {
+  width: 48px; height: 48px; border-radius: var(--radius-md);
+  background: var(--green-light); display: flex;
+  align-items: center; justify-content: center;
+  font-size: 1.3rem; flex-shrink: 0;
+}
+.optimal-body { flex: 1; }
+.optimal-label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--green); margin-bottom: 3px; }
+.optimal-headline { font-size: 0.95rem; font-weight: 600; color: var(--slate-800); margin-bottom: 3px; }
+.optimal-sub { font-size: 0.78rem; color: var(--slate-500); line-height: 1.5; }
+.optimal-numbers { text-align: right; flex-shrink: 0; }
+.optimal-monthly { font-size: 1.6rem; font-weight: 700; font-family: var(--font-mono); color: var(--green-dark); line-height: 1; }
+.optimal-annual  { font-size: 0.75rem; color: var(--slate-400); margin-top: 3px; }
+
+/* ── Scenario comparison ── */
+#sensitivity { background: var(--surface); border-top: 1px solid var(--slate-200); padding: 4rem 0; }
+.section-header { margin-bottom: 2rem; }
+.section-header h2 { margin-bottom: 0.4rem; }
+.section-header p  { color: var(--slate-500); font-size: 0.93rem; max-width: 520px; }
+
+.scenario-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1rem; margin-bottom: 1.1rem;
+}
+@media (max-width: 640px) { .scenario-grid { grid-template-columns: 1fr; } }
+
+.scenario-card {
+  border-radius: var(--radius-lg); padding: 1.3rem;
+  border: 2px solid transparent; position: relative;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.scenario-card.best   { background: #F0FDF4; border-color: #BBF7D0; }
+.scenario-card.middle { background: #FFFBEB; border-color: #FDE68A; }
+.scenario-card.worst  { background: #FEF2F2; border-color: #FECACA; }
+.scenario-card.active-scenario.best   { border-color: var(--green); box-shadow: var(--shadow-md); }
+.scenario-card.active-scenario.middle { border-color: var(--amber); box-shadow: var(--shadow-md); }
+.scenario-card.active-scenario.worst  { border-color: var(--red);   box-shadow: var(--shadow-md); }
+
+.scenario-grade-tag {
+  position: absolute; top: 12px; right: 12px;
+  width: 30px; height: 30px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; font-weight: 700; font-family: var(--font-mono);
+}
+.scenario-card.best   .scenario-grade-tag { background: var(--green-light); color: var(--green-dark); }
+.scenario-card.middle .scenario-grade-tag { background: var(--amber-light); color: var(--amber-dark); }
+.scenario-card.worst  .scenario-grade-tag { background: var(--red-light);   color: var(--red-dark); }
+
+.scenario-badge-label {
+  font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.09em; padding: 3px 9px; border-radius: 100px;
+  margin-bottom: 0.8rem; display: inline-block;
+}
+.scenario-card.best   .scenario-badge-label { background: var(--green-light); color: var(--green-dark); }
+.scenario-card.middle .scenario-badge-label { background: var(--amber-light); color: var(--amber-dark); }
+.scenario-card.worst  .scenario-badge-label { background: var(--red-light);   color: var(--red-dark); }
+
+.scenario-title  { font-size: 0.86rem; font-weight: 600; color: var(--slate-800); margin-bottom: 2px; }
+.scenario-split  { font-size: 0.73rem; color: var(--slate-500); margin-bottom: 0.9rem; }
+.scenario-cost   {
+  font-size: 1.7rem; font-weight: 700; font-family: var(--font-mono);
+  letter-spacing: -0.02em; margin-bottom: 2px; line-height: 1;
+}
+.scenario-card.best   .scenario-cost { color: var(--green-dark); }
+.scenario-card.middle .scenario-cost { color: var(--amber-dark); }
+.scenario-card.worst  .scenario-cost { color: var(--red-dark); }
+.scenario-annual { font-size: 0.75rem; color: var(--slate-400); margin-bottom: 0.8rem; }
+.scenario-bar-wrap { height: 4px; background: rgba(0,0,0,0.06); border-radius: 100px; overflow: hidden; }
+.scenario-bar { height: 100%; border-radius: 100px; transition: width 0.4s ease; }
+.scenario-card.best   .scenario-bar { background: var(--green); }
+.scenario-card.middle .scenario-bar { background: var(--amber); }
+.scenario-card.worst  .scenario-bar { background: var(--red); }
+
+.current-you-tag {
+  position: absolute; top: 10px; right: 48px;
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  background: var(--navy); color: #fff; padding: 3px 8px; border-radius: 100px;
+}
+
+.you-are-here {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.8rem; color: var(--slate-500);
+  padding: 0.85rem 1.2rem;
+  background: var(--surface-2); border-radius: var(--radius-md);
+  border: 1px solid var(--slate-200);
+}
+.you-are-here-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); flex-shrink: 0; }
+
+/* ── Bonus round: household offsets ── */
+#offsets { background: var(--page-bg); padding: 4.5rem 0; }
+
+.bonus-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 1.5rem;
+  margin-bottom: 2rem; flex-wrap: wrap;
+}
+.bonus-header-left {}
+.bonus-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--amber-dark);
+  background: var(--amber-light); padding: 4px 12px;
+  border-radius: 100px; margin-bottom: 0.75rem;
+}
+.bonus-header h2 { margin-bottom: 0.4rem; }
+.bonus-header p  { color: var(--slate-500); font-size: 0.9rem; max-width: 420px; }
+
+.bonus-total-pill {
+  background: var(--surface); border: 1.5px solid var(--slate-200);
+  border-radius: var(--radius-lg); padding: 1rem 1.5rem;
+  text-align: center; flex-shrink: 0; box-shadow: var(--shadow-xs);
+  min-width: 160px;
+}
+.bonus-total-label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--slate-400); margin-bottom: 4px; }
+.bonus-total-value { font-size: 1.8rem; font-weight: 700; font-family: var(--font-mono); color: var(--amber-dark); line-height: 1; }
+.bonus-total-sub   { font-size: 0.72rem; color: var(--slate-400); margin-top: 3px; }
+
+.appliance-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 1rem; margin-bottom: 1.25rem;
+}
+@media (max-width: 560px) { .appliance-grid { grid-template-columns: 1fr; } }
+
+.appliance-card {
+  background: var(--surface); border-radius: var(--radius-lg);
+  border: 1.5px solid var(--slate-200); padding: 1.25rem 1.4rem;
+  display: flex; align-items: center; gap: 1rem;
+  cursor: pointer; transition: border-color 0.2s, background 0.2s;
+  box-shadow: var(--shadow-xs);
+}
+.appliance-card:hover { border-color: var(--slate-300); }
+.appliance-card.toggled {
+  border-color: var(--amber);
+  background: #FFFBEB;
+}
+
+.appliance-icon {
+  width: 44px; height: 44px; border-radius: var(--radius-md);
+  background: var(--slate-100); display: flex; align-items: center;
+  justify-content: center; font-size: 1.25rem; flex-shrink: 0;
+  transition: background 0.2s;
+}
+.appliance-card.toggled .appliance-icon { background: var(--amber-light); }
+
+.appliance-body { flex: 1; }
+.appliance-name   { font-size: 0.9rem; font-weight: 600; color: var(--slate-800); margin-bottom: 2px; }
+.appliance-desc   { font-size: 0.75rem; color: var(--slate-500); line-height: 1.45; }
+.appliance-saving {
+  font-size: 0.82rem; font-weight: 600; font-family: var(--font-mono);
+  color: var(--slate-400); text-align: right; flex-shrink: 0;
+  transition: color 0.2s;
+}
+.appliance-card.toggled .appliance-saving { color: var(--amber-dark); }
+
+.appliance-toggle {
+  width: 38px; height: 22px; border-radius: 100px;
+  background: var(--slate-200); position: relative;
+  flex-shrink: 0; transition: background 0.2s; cursor: pointer;
+  border: none; padding: 0;
+}
+.appliance-toggle::after {
+  content: ''; position: absolute;
+  top: 3px; left: 3px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; transition: transform 0.2s;
+  box-shadow: var(--shadow-xs);
+}
+.appliance-card.toggled .appliance-toggle { background: var(--amber); }
+.appliance-card.toggled .appliance-toggle::after { transform: translateX(16px); }
+
+.bonus-combined {
+  background: var(--surface); border-radius: var(--radius-lg);
+  border: 1px solid var(--slate-200); padding: 1.4rem 1.6rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+  box-shadow: var(--shadow-sm);
+}
+.bonus-combined-left { flex: 1; min-width: 200px; }
+.bonus-combined-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--slate-400); margin-bottom: 4px; }
+.bonus-combined-value { font-size: 1.5rem; font-weight: 700; font-family: var(--font-mono); color: var(--slate-800); }
+.bonus-combined-sub   { font-size: 0.78rem; color: var(--slate-500); margin-top: 3px; }
+.bonus-combined-disclaimer { font-size: 0.7rem; color: var(--slate-400); margin-top: 6px; font-style: italic; }
+.bonus-combined-right { text-align: center; flex-shrink: 0; }
+.btn-bonus-cta {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--amber); color: #fff; font-family: var(--font);
+  font-size: 0.85rem; font-weight: 600; padding: 0.65rem 1.4rem;
+  border: none; border-radius: var(--radius-md); cursor: pointer;
+  text-decoration: none; transition: background 0.15s;
+}
+.btn-bonus-cta:hover { background: #B45309; }
+
+/* ── Explainer (education) ── */
+#explainer { background: var(--surface); border-top: 1px solid var(--slate-200); padding: 4.5rem 0; }
+
+.explainer-header { text-align: center; max-width: 520px; margin: 0 auto 2.5rem; }
+.explainer-header h2 { margin-bottom: 0.6rem; }
+.explainer-header p  { color: var(--slate-500); font-size: 0.93rem; }
+
+.explainer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+@media (max-width: 640px) { .explainer-grid { grid-template-columns: 1fr; } }
+
+.explainer-card { border-radius: var(--radius-lg); padding: 1.5rem; }
+.explainer-card.blue   { background: #EFF6FF; border: 1.5px solid #BFDBFE; }
+.explainer-card.green  { background: #F0FDF4; border: 1.5px solid #BBF7D0; }
+.explainer-card.orange { background: #FFF7ED; border: 1.5px solid #FED7AA; }
+
+.explainer-icon {
+  width: 40px; height: 40px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 0.9rem; font-size: 18px;
+}
+.explainer-icon.blue   { background: var(--blue-light); }
+.explainer-icon.green  { background: var(--green-light); }
+.explainer-icon.orange { background: var(--orange-light); }
+
+.explainer-card h3 { margin-bottom: 0.4rem; font-size: 0.93rem; }
+.explainer-card.blue   h3 { color: var(--blue-dark); }
+.explainer-card.green  h3 { color: var(--green-dark); }
+.explainer-card.orange h3 { color: #9A3412; }
+.explainer-card p { font-size: 0.83rem; color: var(--slate-600); }
+
+.explainer-callout {
+  background: var(--navy); border-radius: var(--radius-lg);
+  padding: 1.3rem 1.75rem;
+  display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap;
+}
+.explainer-callout p { color: #94A3B8; font-size: 0.88rem; flex: 1; min-width: 200px; }
+.explainer-callout strong { color: #fff; }
+
+/* ── Tips ── */
+#tips { background: var(--page-bg); padding: 4.5rem 0; }
+.tips-header { text-align: center; max-width: 480px; margin: 0 auto 2.5rem; }
+.tips-header h2 { margin-bottom: 0.5rem; }
+.tips-header p  { color: var(--slate-500); font-size: 0.93rem; }
+.tips-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+@media (max-width: 640px) { .tips-grid { grid-template-columns: 1fr; } }
+
+.tip-card {
+  background: var(--surface); border-radius: var(--radius-lg);
+  padding: 1.5rem; box-shadow: var(--shadow-sm);
+  border: 1px solid var(--slate-200);
+}
+.tip-number {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--navy); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 0.78rem; margin-bottom: 0.85rem;
+  font-family: var(--font-mono);
+}
+.tip-card h3 { margin-bottom: 0.4rem; font-size: 0.93rem; }
+.tip-card p  { font-size: 0.82rem; color: var(--slate-600); line-height: 1.65; }
+.tip-time-badge {
+  display: inline-block; background: var(--blue-light); color: var(--blue-dark);
+  font-size: 0.72rem; font-weight: 600; padding: 3px 10px;
+  border-radius: 100px; margin-top: 0.65rem;
+}
+
+/* ── CTA ── */
+#cta { background: var(--navy); padding: 5.5rem 0; }
+.cta-inner { text-align: center; max-width: 520px; margin: 0 auto; padding: 0 1.5rem; }
+#cta h2   { color: #fff; margin-bottom: 0.85rem; }
+#cta p    { color: #64748B; margin-bottom: 2rem; font-size: 0.95rem; }
+.cta-btn-group { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
+.btn-cta-primary {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--green); color: #fff; font-family: var(--font);
+  font-size: 0.97rem; font-weight: 600; padding: 0.9rem 2rem;
+  border: none; border-radius: var(--radius-md); cursor: pointer;
+  text-decoration: none; transition: background 0.15s;
+}
+.btn-cta-primary:hover { background: #15803D; }
+.btn-cta-ghost {
+  display: inline-flex; color: #64748B; font-family: var(--font);
+  font-size: 0.9rem; padding: 0.9rem 1.5rem;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius-md); text-decoration: none;
+  background: transparent; transition: color 0.15s, border-color 0.15s;
+}
+.btn-cta-ghost:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+.cta-disclaimer { font-size: 0.71rem; color: #334155; line-height: 1.65; max-width: 420px; margin: 0 auto; }
+
+/* =============================================
+   SCREEN 2 — DASHBOARD
+   ============================================= */
+#screen-dashboard { background: var(--page-bg); padding-top: 6rem; }
+
+.dash-header {
+  background: var(--surface); border-bottom: 1px solid var(--slate-200);
+  padding: 2rem 0;
+}
+.dash-header-inner {
+  max-width: 980px; margin: 0 auto; padding: 0 1.5rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;
+}
+.dash-user { display: flex; align-items: center; gap: 1rem; }
+.dash-avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--navy-light); display: flex; align-items: center;
+  justify-content: center; font-weight: 700; font-size: 0.9rem; color: var(--navy-mid);
+  border: 2px solid var(--slate-200); flex-shrink: 0;
+}
+.dash-name    { font-size: 1rem; font-weight: 600; color: var(--slate-800); }
+.dash-status  { font-size: 0.78rem; color: var(--slate-500); margin-top: 2px; }
+.dash-status-dot {
+  display: inline-block; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--green); margin-right: 5px;
+}
+.dash-meta { display: flex; align-items: center; gap: 0.75rem; }
+.dash-period { font-size: 0.8rem; color: var(--slate-500); }
+
+.dash-body { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem 5rem; }
+
+/* Metric row */
+.dash-metrics {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1rem; margin-bottom: 1.5rem;
+}
+@media (max-width: 720px) { .dash-metrics { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 400px) { .dash-metrics { grid-template-columns: 1fr; } }
+
+.metric-card {
+  background: var(--surface); border-radius: var(--radius-lg);
+  padding: 1.1rem 1.25rem; border: 1px solid var(--slate-200);
+  box-shadow: var(--shadow-xs);
+}
+.metric-label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--slate-400); margin-bottom: 6px; }
+.metric-value { font-size: 1.7rem; font-weight: 700; font-family: var(--font-mono); color: var(--slate-800); letter-spacing: -0.02em; line-height: 1; }
+.metric-value.green { color: var(--green); }
+.metric-value.amber { color: var(--amber); }
+.metric-value.blue  { color: var(--blue); }
+.metric-sub { font-size: 0.72rem; color: var(--slate-400); margin-top: 5px; }
+.metric-delta {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 0.7rem; font-weight: 600; padding: 2px 7px;
+  border-radius: 100px; margin-top: 6px;
+}
+.metric-delta.up   { background: var(--green-light); color: var(--green-dark); }
+.metric-delta.down { background: var(--red-light);   color: var(--red-dark); }
+.metric-delta.flat { background: var(--slate-100);   color: var(--slate-500); }
+
+/* Dashboard main grid */
+.dash-main {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 1.25rem; margin-bottom: 1.25rem;
+}
+@media (max-width: 720px) { .dash-main { grid-template-columns: 1fr; } }
+
+/* Grade card */
+.dash-grade-card {
+  background: var(--surface); border-radius: var(--radius-lg);
+  border: 1px solid var(--slate-200); overflow: hidden; box-shadow: var(--shadow-sm);
+}
+.dash-grade-top {
+  background: #F0FDF4; padding: 1.4rem 1.5rem;
+  display: flex; align-items: center; gap: 1.1rem;
+  border-bottom: 1px solid #BBF7D0;
+}
+.dash-grade-badge {
+  width: 64px; height: 64px; border-radius: var(--radius-md);
+  background: var(--green-light); display: flex;
+  align-items: center; justify-content: center;
+  font-size: 2rem; font-weight: 700; font-family: var(--font-mono);
+  color: var(--green-dark); flex-shrink: 0;
+}
+.dash-grade-info {}
+.dash-grade-title { font-size: 1rem; font-weight: 600; color: var(--slate-800); margin-bottom: 3px; }
+.dash-grade-sub   { font-size: 0.8rem; color: var(--slate-500); line-height: 1.5; }
+.dash-grade-body  { padding: 1.1rem 1.5rem; }
+
+.charge-bar-row { margin-bottom: 0.85rem; }
+.charge-bar-label {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.78rem; margin-bottom: 5px;
+}
+.charge-bar-label-text { color: var(--slate-600); font-weight: 500; }
+.charge-bar-label-pct  { font-family: var(--font-mono); font-weight: 600; }
+.charge-bar-track {
+  height: 8px; background: var(--slate-100); border-radius: 100px; overflow: hidden;
+}
+.charge-bar-fill { height: 100%; border-radius: 100px; }
+.charge-bar-fill.blue   { background: var(--blue); }
+.charge-bar-fill.orange { background: var(--orange); }
+
+/* Week chart */
+.week-chart { margin-top: 1rem; }
+.week-chart-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--slate-400); margin-bottom: 0.75rem; }
+.week-bars {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 4px; align-items: end; height: 72px;
+}
+.week-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.week-bar {
+  width: 100%; border-radius: 3px 3px 0 0; min-height: 6px;
+  transition: opacity 0.2s;
+}
+.week-bar.offpeak { background: var(--blue); }
+.week-bar.peak    { background: var(--orange); }
+.week-bar.none    { background: var(--slate-200); }
+.week-day { font-size: 0.62rem; color: var(--slate-400); text-transform: uppercase; }
+
+/* Coaching messages */
+.dash-messages { display: flex; flex-direction: column; gap: 1rem; }
+
+.msg-card {
+  background: var(--surface); border-radius: var(--radius-lg);
+  border: 1px solid var(--slate-200); overflow: hidden; box-shadow: var(--shadow-sm);
+}
+.msg-card-header {
+  padding: 0.85rem 1.25rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--slate-100);
+  display: flex; align-items: center; gap: 0.65rem;
+}
+.msg-card-icon {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--navy-light); display: flex;
+  align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0;
+}
+.msg-card-from { font-size: 0.8rem; font-weight: 600; color: var(--slate-700); }
+.msg-card-time { font-size: 0.7rem; color: var(--slate-400); margin-left: auto; }
+
+.msg-bubbles { padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+
+.bubble {
+  max-width: 85%; padding: 0.75rem 1rem;
+  border-radius: 18px; font-size: 0.85rem; line-height: 1.55;
+  position: relative;
+}
+.bubble.inbound {
+  background: var(--slate-100); color: var(--slate-800);
+  border-bottom-left-radius: 4px; align-self: flex-start;
+}
+.bubble.inbound.positive { background: #F0FDF4; border: 1px solid #BBF7D0; color: var(--green-dark); }
+.bubble.inbound.warning  { background: #FFFBEB; border: 1px solid #FDE68A; color: var(--amber-dark); }
+
+.bubble-time { font-size: 0.65rem; color: var(--slate-400); margin-top: 4px; display: block; }
+
+/* Cost projection */
+.cost-projection {
+  background: var(--surface); border-radius: var(--radius-lg);
+  border: 1px solid var(--slate-200); padding: 1.4rem 1.5rem;
+  box-shadow: var(--shadow-sm); margin-bottom: 1.25rem;
+}
+.projection-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+.projection-title   { font-size: 0.95rem; font-weight: 600; color: var(--slate-800); margin-bottom: 2px; }
+.projection-subtitle { font-size: 0.78rem; color: var(--slate-500); }
+.projection-values  { display: flex; gap: 1.5rem; align-items: flex-start; }
+.proj-val-group { text-align: right; }
+.proj-val-label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--slate-400); margin-bottom: 3px; }
+.proj-val       { font-size: 1.3rem; font-weight: 700; font-family: var(--font-mono); }
+.proj-val.green { color: var(--green); }
+.proj-val.slate { color: var(--slate-600); }
+
+.proj-bar-track {
+  height: 10px; background: var(--slate-100); border-radius: 100px; overflow: hidden; margin-bottom: 6px;
+}
+.proj-bar-fill  { height: 100%; background: var(--blue); border-radius: 100px; width: 58%; }
+.proj-bar-label { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--slate-400); }
+
+/* scroll offsets */
+#calculator, #sensitivity, #offsets, #explainer, #tips, #cta { scroll-margin-top: 56px; }
+
+/* =============================================
+   SCREEN 3 — CUSTOMER JOURNEY
+   ============================================= */
+#screen-journey { background: var(--page-bg); padding-top: 56px; min-height: 100vh; }
+.journey-wrap { max-width: 1060px; margin: 0 auto; padding: 3.5rem 1.5rem 5rem; }
+.journey-page-header { margin-bottom: 3rem; }
+.journey-page-header h2 { margin-bottom: 0.4rem; color: var(--navy); }
+.journey-page-header p  { color: var(--slate-500); font-size: 0.93rem; max-width: 560px; }
+
+.journey-phase { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
+.journey-phase-line  { flex: 1; height: 1px; background: var(--slate-200); }
+.journey-phase-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--slate-400); white-space: nowrap; }
+
+.journey-flow {
+  display: flex; align-items: flex-start; gap: 0;
+  overflow-x: auto; padding-bottom: 1rem; margin-bottom: 2.5rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin; scrollbar-color: var(--slate-300) transparent;
+}
+.journey-flow::-webkit-scrollbar { height: 4px; }
+.journey-flow::-webkit-scrollbar-thumb { background: var(--slate-300); border-radius: 100px; }
+
+.journey-arrow { display: flex; align-items: center; flex-shrink: 0; padding: 0 0.25rem; margin-top: 3.25rem; }
+.journey-arrow svg { color: var(--slate-300); }
+
+.tp-card {
+  background: var(--surface); border: 1.5px solid var(--slate-200);
+  border-radius: var(--radius-lg); width: 196px; min-width: 196px;
+  flex-shrink: 0; overflow: hidden; box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s, border-color 0.2s; position: relative;
+}
+.tp-card:hover { box-shadow: var(--shadow-md); border-color: var(--slate-300); }
+.tp-card.destination { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.1), var(--shadow-md); }
+
+.tp-card-top { padding: 1.2rem 1.2rem 0.9rem; border-bottom: 1px solid var(--slate-100); }
+.tp-channel-tag { font-size: 0.61rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: 100px; margin-bottom: 0.8rem; display: inline-block; }
+.tp-icon { width: 42px; height: 42px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; margin-bottom: 0.8rem; }
+.tp-title { font-size: 0.86rem; font-weight: 700; color: var(--slate-800); margin-bottom: 0.3rem; }
+.tp-desc  { font-size: 0.74rem; color: var(--slate-500); line-height: 1.55; }
+.tp-card-bottom { padding: 0.8rem 1.2rem; background: var(--surface-2); }
+.tp-cta-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--slate-400); margin-bottom: 4px; }
+.tp-cta-text  { font-size: 0.78rem; font-weight: 600; line-height: 1.4; }
+
+.qr-block { display: flex; align-items: center; gap: 0.5rem; margin-top: 5px; }
+.qr-label { font-size: 0.68rem; color: var(--slate-500); line-height: 1.4; }
+
+.tp-card.c-slate  .tp-channel-tag { background: var(--slate-100);  color: var(--slate-600); }
+.tp-card.c-blue   .tp-channel-tag { background: var(--blue-light);  color: var(--blue-dark); }
+.tp-card.c-green  .tp-channel-tag { background: var(--green-light); color: var(--green-dark); }
+.tp-card.c-amber  .tp-channel-tag { background: var(--amber-light); color: var(--amber-dark); }
+.tp-card.c-teal   .tp-channel-tag { background: var(--teal-light);  color: #0F766E; }
+.tp-card.c-navy   .tp-channel-tag { background: var(--navy-light);  color: var(--navy-mid); }
+.tp-card.c-slate  .tp-icon { background: var(--slate-100); }
+.tp-card.c-blue   .tp-icon { background: var(--blue-light); }
+.tp-card.c-green  .tp-icon { background: var(--green-light); }
+.tp-card.c-amber  .tp-icon { background: var(--amber-light); }
+.tp-card.c-teal   .tp-icon { background: var(--teal-light); }
+.tp-card.c-navy   .tp-icon { background: var(--navy-light); }
+.tp-card.c-blue   .tp-cta-text { color: var(--blue-dark); }
+.tp-card.c-green  .tp-cta-text { color: var(--green-dark); }
+.tp-card.c-amber  .tp-cta-text { color: var(--amber-dark); }
+.tp-card.c-teal   .tp-cta-text { color: #0F766E; }
+.tp-card.c-navy   .tp-cta-text { color: var(--navy-mid); }
+.tp-card.c-slate  .tp-cta-text { color: var(--slate-700); }
+.tp-card.destination .tp-cta-text { color: var(--blue-dark); }
+
+.dest-badge {
+  position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+  font-size: 0.59rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em;
+  background: var(--blue); color: #fff;
+  padding: 3px 10px; border-radius: 0 0 var(--radius-sm) var(--radius-sm); white-space: nowrap;
+}
+
+.journey-legend {
+  background: var(--surface); border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg); padding: 1.5rem 1.75rem;
+  box-shadow: var(--shadow-xs);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem 2rem;
+  margin-bottom: 1.25rem;
+}
+@media (max-width: 600px) { .journey-legend { grid-template-columns: 1fr; } }
+.legend-item  { display: flex; align-items: flex-start; gap: 0.75rem; }
+.legend-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.legend-dot.blue  { background: var(--blue); }
+.legend-dot.green { background: var(--green); }
+.legend-dot.amber { background: var(--amber); }
+.legend-dot.slate { background: var(--slate-400); }
+.legend-title { font-size: 0.82rem; font-weight: 600; color: var(--slate-700); margin-bottom: 2px; }
+.legend-desc  { font-size: 0.74rem; color: var(--slate-500); line-height: 1.5; }
+
+.journey-note {
+  padding: 1.1rem 1.5rem;
+  background: var(--navy-light); border-radius: var(--radius-md);
+  border-left: 3px solid var(--blue);
+  font-size: 0.79rem; color: var(--navy-mid); line-height: 1.6;
+}
+.journey-note strong { color: var(--navy); }
+
+/* =============================================
+   SCREEN 3 — CUSTOMER JOURNEY
+   ============================================= */
+#screen-journey { background: var(--page-bg); padding-top: 56px; min-height: 100vh; }
+.journey-wrap { max-width: 1060px; margin: 0 auto; padding: 3.5rem 1.5rem 5rem; }
+.journey-page-header { margin-bottom: 3rem; }
+.journey-page-header h2 { margin-bottom: 0.4rem; color: var(--navy); }
+.journey-page-header p  { color: var(--slate-500); font-size: 0.93rem; max-width: 560px; }
+
+.journey-phase { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
+.journey-phase-line  { flex: 1; height: 1px; background: var(--slate-200); }
+.journey-phase-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--slate-400); white-space: nowrap; }
+
+.journey-flow {
+  display: flex; align-items: flex-start; gap: 0;
+  overflow-x: auto; padding-bottom: 1rem; margin-bottom: 2.5rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin; scrollbar-color: var(--slate-300) transparent;
+}
+.journey-flow::-webkit-scrollbar { height: 4px; }
+.journey-flow::-webkit-scrollbar-thumb { background: var(--slate-300); border-radius: 100px; }
+
+.journey-arrow { display: flex; align-items: center; flex-shrink: 0; padding: 0 0.25rem; margin-top: 3.2rem; }
+.journey-arrow svg { color: var(--slate-300); }
+
+.tp-card {
+  background: var(--surface); border: 1.5px solid var(--slate-200);
+  border-radius: var(--radius-lg); width: 193px; min-width: 193px;
+  flex-shrink: 0; overflow: hidden; box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s, border-color 0.2s; position: relative;
+}
+.tp-card:hover { box-shadow: var(--shadow-md); border-color: var(--slate-300); }
+.tp-card.destination { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.1), var(--shadow-md); }
+
+.tp-card-top { padding: 1.2rem 1.2rem 0.9rem; border-bottom: 1px solid var(--slate-100); }
+.tp-channel-tag { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; padding: 3px 8px; border-radius: 100px; margin-bottom: 0.8rem; display: inline-block; }
+.tp-icon { width: 40px; height: 40px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 0.75rem; }
+.tp-title { font-size: 0.85rem; font-weight: 700; color: var(--slate-800); margin-bottom: 0.3rem; }
+.tp-desc  { font-size: 0.73rem; color: var(--slate-500); line-height: 1.55; }
+.tp-card-bottom { padding: 0.8rem 1.2rem; background: var(--surface-2); }
+.tp-cta-label { font-size: 0.59rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--slate-400); margin-bottom: 4px; }
+.tp-cta-text  { font-size: 0.77rem; font-weight: 600; line-height: 1.4; color: var(--slate-700); }
+
+.qr-block { display: flex; align-items: center; gap: 0.5rem; margin-top: 5px; }
+.qr-label { font-size: 0.67rem; color: var(--slate-500); line-height: 1.4; }
+
+.tp-card.c-slate  .tp-channel-tag { background: var(--slate-100);  color: var(--slate-600); }
+.tp-card.c-blue   .tp-channel-tag { background: var(--blue-light);  color: var(--blue-dark); }
+.tp-card.c-green  .tp-channel-tag { background: var(--green-light); color: var(--green-dark); }
+.tp-card.c-amber  .tp-channel-tag { background: var(--amber-light); color: var(--amber-dark); }
+.tp-card.c-teal   .tp-channel-tag { background: var(--teal-light);  color: #0F766E; }
+.tp-card.c-navy   .tp-channel-tag { background: var(--navy-light);  color: var(--navy-mid); }
+.tp-card.c-slate  .tp-icon { background: var(--slate-100); }
+.tp-card.c-blue   .tp-icon { background: var(--blue-light); }
+.tp-card.c-green  .tp-icon { background: var(--green-light); }
+.tp-card.c-amber  .tp-icon { background: var(--amber-light); }
+.tp-card.c-teal   .tp-icon { background: var(--teal-light); }
+.tp-card.c-navy   .tp-icon { background: var(--navy-light); }
+.tp-card.c-blue   .tp-cta-text { color: var(--blue-dark); }
+.tp-card.c-green  .tp-cta-text { color: var(--green-dark); }
+.tp-card.c-amber  .tp-cta-text { color: var(--amber-dark); }
+.tp-card.c-navy   .tp-cta-text { color: var(--navy-mid); }
+
+.dest-badge {
+  position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+  font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em;
+  background: var(--blue); color: #fff;
+  padding: 3px 10px; border-radius: 0 0 var(--radius-sm) var(--radius-sm); white-space: nowrap;
+}
+
+.journey-legend {
+  background: var(--surface); border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg); padding: 1.4rem 1.75rem;
+  box-shadow: var(--shadow-xs);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 2rem;
+  margin-bottom: 1.25rem;
+}
+@media (max-width: 600px) { .journey-legend { grid-template-columns: 1fr; } }
+.legend-item  { display: flex; align-items: flex-start; gap: 0.7rem; }
+.legend-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.legend-dot.blue  { background: var(--blue); }
+.legend-dot.green { background: var(--green); }
+.legend-dot.amber { background: var(--amber); }
+.legend-dot.slate { background: var(--slate-400); }
+.legend-title { font-size: 0.81rem; font-weight: 600; color: var(--slate-700); margin-bottom: 2px; }
+.legend-desc  { font-size: 0.73rem; color: var(--slate-500); line-height: 1.5; }
+
+.journey-note {
+  padding: 1rem 1.4rem;
+  background: var(--navy-light); border-radius: var(--radius-md);
+  border-left: 3px solid var(--blue);
+  font-size: 0.78rem; color: var(--navy-mid); line-height: 1.6;
+}
+.journey-note strong { color: var(--navy); }
+
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- ── Nav ── -->
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo" onclick="showScreen('calculator'); return false;">
+      ⚡ ChargeSmart
+      <span class="nav-logo-badge">AMEREN</span>
+    </a>
+    <div class="nav-links">
+      <button class="nav-tab active-tab" onclick="showScreen('calculator')" id="tab-calc">Calculator</button>
+      <button class="nav-tab" onclick="showScreen('dashboard')" id="tab-dash">My Dashboard</button>
+      <button class="nav-tab" onclick="showScreen('journey')" id="tab-journey">Customer Journey</button>
+    </div>
+    <a href="#cta" class="nav-cta" onclick="showScreen('calculator'); setTimeout(()=>document.getElementById('cta').scrollIntoView({behavior:'smooth'}),50); return false;">Enroll now</a>
+  </div>
+</nav>
+
+<!-- ================================================
+     SCREEN 1: CALCULATOR
+     ================================================ -->
+<div id="screen-calculator" class="screen active">
+
+  <!-- Orient strip -->
+  <div id="orient">
+    <div class="orient-inner">
+      <h1>See how much you could<br><strong>save with ChargeSmart</strong></h1>
+      <p class="orient-sub">
+        Your savings depend on <strong>when you charge</strong> — not just that you charge.
+        Adjust the inputs and watch your numbers update instantly.
+      </p>
+    </div>
+  </div>
+
+  <!-- Calculator -->
+  <section id="calculator">
+    <div class="container">
+      <div class="calc-layout">
+
+        <!-- Inputs -->
+        <div class="card">
+          <div class="section-label" style="margin-bottom:1.2rem;">Your details</div>
+
+          <div class="input-group">
+            <div class="input-label">
+              <span class="input-label-text">Monthly miles driven</span>
+              <span class="input-label-value" id="milesDisplay">1,000 mi</span>
+            </div>
+            <input type="range" id="milesSlider" min="500" max="2000" step="50" value="1000">
+            <div class="range-labels"><span>500 mi</span><span>2,000 mi</span></div>
+          </div>
+
+          <div class="input-group">
+            <div class="input-label" style="margin-bottom:0.8rem;">
+              <span class="input-label-text">When do you usually charge?</span>
+            </div>
+            <div class="behavior-selector">
+              <div class="behavior-option sel-blue" data-behavior="optimized">
+                <div class="behavior-dot"></div>
+                <div class="behavior-text">
+                  <div class="behavior-title">Mostly overnight</div>
+                  <div class="behavior-subtitle">85% off-peak · 15% daytime</div>
+                </div>
+                <span class="badge badge-blue">Best</span>
+              </div>
+              <div class="behavior-option" data-behavior="mixed">
+                <div class="behavior-dot"></div>
+                <div class="behavior-text">
+                  <div class="behavior-title">Mix of day and night</div>
+                  <div class="behavior-subtitle">50% off-peak · 50% daytime</div>
+                </div>
+                <span class="badge badge-amber">Mixed</span>
+              </div>
+              <div class="behavior-option" data-behavior="poor">
+                <div class="behavior-dot"></div>
+                <div class="behavior-text">
+                  <div class="behavior-title">Mostly daytime</div>
+                  <div class="behavior-subtitle">25% off-peak · 75% daytime</div>
+                </div>
+                <span class="badge badge-orange">Costly</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+          <button class="advanced-toggle" id="advancedToggle" onclick="toggleAdvanced()">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+              <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Advanced settings
+          </button>
+          <div class="advanced-panel" id="advancedPanel">
+            <div class="advanced-row" style="margin-top:0.75rem;">
+              <div class="adv-field">
+                <label>Base rate ($/kWh)</label>
+                <input type="number" id="baseRate" value="0.13" min="0.08" max="0.30" step="0.01">
+              </div>
+              <div class="adv-field">
+                <label>EV efficiency (mi/kWh)</label>
+                <input type="number" id="efficiency" value="3.2" min="2.0" max="5.0" step="0.1">
+              </div>
+            </div>
+            <p style="font-size:0.71rem; color:var(--slate-400); margin-top:0.6rem; line-height:1.55;">Off-peak and peak rates remain fixed. These fields adjust your reference baseline and vehicle efficiency only.</p>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-card">
+
+          <!-- Grade banner -->
+          <div class="grade-banner gbg-A" id="gradeBanner">
+            <div class="grade-badge gb-A" id="gradeBadge">A</div>
+            <div class="grade-info">
+              <div class="grade-title" id="gradeTitle">Charging champion</div>
+              <div class="grade-subtitle" id="gradeSubtitle">You're using the program the way it's designed. Night charging is where savings happen.</div>
+              <div class="grade-nudge" id="gradeNudge">Top ChargeSmart members hit Grade A every month.</div>
+            </div>
+          </div>
+
+          <!-- Breakdown -->
+          <div class="results-body">
+            <div class="section-label" style="margin-bottom:0.8rem;">Monthly breakdown</div>
+            <div class="result-line">
+              <span class="result-line-label">Energy used</span>
+              <span class="result-line-value" id="kwhDisplay">— kWh</span>
+            </div>
+            <div class="result-line">
+              <span class="result-line-label">Off-peak charging</span>
+              <span class="result-line-value blue" id="offpeakCost">—</span>
+            </div>
+            <div class="result-line">
+              <span class="result-line-label">Daytime charging</span>
+              <span class="result-line-value" id="peakCost">—</span>
+            </div>
+            <div class="result-line">
+              <span class="result-line-label">Program credit</span>
+              <span class="result-line-value green">− $4.00</span>
+            </div>
+            <div class="result-line" style="border-top:1px solid var(--slate-200); margin-top:0.2rem; padding-top:0.6rem;">
+              <span class="result-line-label" style="color:var(--slate-600); font-weight:500;">Standard rate (no program)</span>
+              <span class="result-line-value" id="baseCost">—</span>
+            </div>
+          </div>
+
+          <!-- Total -->
+          <div class="result-total">
+            <div>
+              <div class="result-total-label">Monthly EV charging cost</div>
+              <div class="result-total-value" id="totalMonthly">$—</div>
+              <div class="result-savings-line" id="savingsLine">Calculating…</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="result-annual-label">Annual</div>
+              <div class="result-annual-value" id="totalAnnual">$—</div>
+            </div>
+          </div>
+
+          <!-- Inline CTA -->
+          <div class="inline-cta">
+            <div class="inline-cta-text" id="inlineCTAText"><strong>Ready to lock in your savings?</strong> Enrolling takes just a few minutes.</div>
+            <a href="#" class="btn-inline-cta">
+              Enroll in ChargeSmart
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 7h9M8 3.5L11.5 7 8 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Optimal ceiling callout -->
+      <div class="optimal-callout" id="optimalCallout">
+        <div class="optimal-star">⭐</div>
+        <div class="optimal-body">
+          <div class="optimal-label">Your ceiling — Grade A+</div>
+          <div class="optimal-headline">What's possible with 100% overnight charging</div>
+          <div class="optimal-sub">If every charge happened during the off-peak window, here's the maximum you could save at your current mileage. A realistic stretch goal for committed members.</div>
+        </div>
+        <div class="optimal-numbers">
+          <div class="optimal-monthly" id="optimalMonthly">$—</div>
+          <div class="optimal-annual" id="optimalAnnual">$— /year</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Scenario comparison -->
+  <section id="sensitivity">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">Behavior comparison</div>
+        <h2>What changes when you shift your charging time?</h2>
+        <p>All three scenarios use your mileage above. The only variable is <em>when</em> you plug in.</p>
+      </div>
+      <div class="scenario-grid">
+        <div class="scenario-card best" id="scenBest">
+          <div class="scenario-grade-tag">A</div>
+          <span class="scenario-badge-label">Best case</span>
+          <div class="scenario-title">Mostly overnight</div>
+          <div class="scenario-split">85% off-peak · 15% peak</div>
+          <div class="scenario-cost" id="scenBestCost">$—</div>
+          <div class="scenario-annual" id="scenBestAnnual">$— /year</div>
+          <div class="scenario-bar-wrap"><div class="scenario-bar" id="scenBestBar"></div></div>
+        </div>
+        <div class="scenario-card middle" id="scenMid">
+          <div class="scenario-grade-tag">C</div>
+          <span class="scenario-badge-label">Mixed</span>
+          <div class="scenario-title">Day and night mix</div>
+          <div class="scenario-split">50% off-peak · 50% peak</div>
+          <div class="scenario-cost" id="scenMidCost">$—</div>
+          <div class="scenario-annual" id="scenMidAnnual">$— /year</div>
+          <div class="scenario-bar-wrap"><div class="scenario-bar" id="scenMidBar"></div></div>
+        </div>
+        <div class="scenario-card worst" id="scenWorst">
+          <div class="scenario-grade-tag">D</div>
+          <span class="scenario-badge-label">High cost</span>
+          <div class="scenario-title">Mostly daytime</div>
+          <div class="scenario-split">25% off-peak · 75% peak</div>
+          <div class="scenario-cost" id="scenWorstCost">$—</div>
+          <div class="scenario-annual" id="scenWorstAnnual">$— /year</div>
+          <div class="scenario-bar-wrap"><div class="scenario-bar" id="scenWorstBar"></div></div>
+        </div>
+      </div>
+      <div class="you-are-here">
+        <div class="you-are-here-dot"></div>
+        <span id="youAreHereText">Your current selection: "Mostly overnight" — updating…</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bonus Round: Household Offsets -->
+  <section id="offsets">
+    <div class="container">
+      <div class="bonus-header">
+        <div class="bonus-header-left">
+          <div class="bonus-tag">🏆 Bonus round</div>
+          <h2>Unlock even more savings</h2>
+          <p>ChargeSmart members can also shift other household appliances to overnight hours — stacking additional savings on top of your EV credit. Toggle what applies to you.</p>
+        </div>
+        <div class="bonus-total-pill">
+          <div class="bonus-total-label">Additional potential</div>
+          <div class="bonus-total-value" id="bonusTotal">$0</div>
+          <div class="bonus-total-sub">/month from appliances</div>
+        </div>
+      </div>
+
+      <div class="appliance-grid">
+        <div class="appliance-card" data-saving="4" onclick="toggleAppliance(this)">
+          <div class="appliance-icon">🍽️</div>
+          <div class="appliance-body">
+            <div class="appliance-name">Dishwasher</div>
+            <div class="appliance-desc">Run after 11pm instead of after dinner. Most modern dishwashers have a delay-start setting.</div>
+          </div>
+          <div class="appliance-saving" id="appSaving0">+ $4/mo</div>
+          <button class="appliance-toggle" tabindex="-1"></button>
+        </div>
+        <div class="appliance-card" data-saving="7" onclick="toggleAppliance(this)">
+          <div class="appliance-icon">👕</div>
+          <div class="appliance-body">
+            <div class="appliance-name">Washer &amp; dryer</div>
+            <div class="appliance-desc">High-draw appliances. Shifting even 3–4 loads per week to overnight makes a measurable difference.</div>
+          </div>
+          <div class="appliance-saving" id="appSaving1">+ $7/mo</div>
+          <button class="appliance-toggle" tabindex="-1"></button>
+        </div>
+        <div class="appliance-card" data-saving="9" onclick="toggleAppliance(this)">
+          <div class="appliance-icon">🌡️</div>
+          <div class="appliance-body">
+            <div class="appliance-name">Smart thermostat</div>
+            <div class="appliance-desc">Pre-cool or pre-heat overnight so your HVAC works less during peak hours. Big impact in summer and winter.</div>
+          </div>
+          <div class="appliance-saving" id="appSaving2">+ $9/mo</div>
+          <button class="appliance-toggle" tabindex="-1"></button>
+        </div>
+        <div class="appliance-card" data-saving="5" onclick="toggleAppliance(this)">
+          <div class="appliance-icon">🚿</div>
+          <div class="appliance-body">
+            <div class="appliance-name">Water heater</div>
+            <div class="appliance-desc">Tank water heaters can be scheduled to heat overnight and hold temperature through the day.</div>
+          </div>
+          <div class="appliance-saving" id="appSaving3">+ $5/mo</div>
+          <button class="appliance-toggle" tabindex="-1"></button>
+        </div>
+      </div>
+
+      <div class="bonus-combined">
+        <div class="bonus-combined-left">
+          <div class="bonus-combined-label">Combined monthly savings potential</div>
+          <div class="bonus-combined-value" id="combinedSavings">Calculating…</div>
+          <div class="bonus-combined-sub" id="combinedSub">EV program + selected appliances</div>
+          <div class="bonus-combined-disclaimer">Appliance estimates are directional. Actual savings vary by household size, usage frequency, and local rates.</div>
+        </div>
+        <div class="bonus-combined-right">
+          <a href="#" class="btn-bonus-cta">
+            Explore the full program
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 7h9M8 3.5L11.5 7 8 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="explainer">
+    <div class="container">
+      <div class="explainer-header">
+        <div class="section-label">How ChargeSmart works</div>
+        <h2>Savings depend on <em>when</em> you charge</h2>
+        <p>ChargeSmart is not a flat discount. Your cost goes up or down based on time of day — and a $4 monthly credit is yours just for participating.</p>
+      </div>
+      <div class="explainer-grid">
+        <div class="explainer-card blue">
+          <div class="explainer-icon blue">🌙</div>
+          <h3>Charge overnight</h3>
+          <p>Plugging in between <strong>11pm and 7am</strong> locks in the lowest rate — around $0.09/kWh. That's where your savings live.</p>
+          <div style="margin-top:0.85rem;"><span class="badge badge-blue">~$0.09/kWh</span></div>
+        </div>
+        <div class="explainer-card green">
+          <div class="explainer-icon green">💳</div>
+          <h3>Monthly credit</h3>
+          <p>Every enrolled month you receive a <strong>$4 bill credit</strong> — regardless of when you charge. It's your guaranteed baseline.</p>
+          <div style="margin-top:0.85rem;"><span class="badge badge-green">$4/month guaranteed</span></div>
+        </div>
+        <div class="explainer-card orange">
+          <div class="explainer-icon orange">☀️</div>
+          <h3>Avoid daytime charging</h3>
+          <p>Charging midday or early evening costs significantly more — up to <strong>$0.20/kWh</strong> — and can erase your savings entirely.</p>
+          <div style="margin-top:0.85rem;"><span class="badge badge-orange">~$0.20/kWh</span></div>
+        </div>
+      </div>
+      <div class="explainer-callout">
+        <div style="font-size:1.4rem; flex-shrink:0;">💡</div>
+        <p><strong>The key insight:</strong> Charging at the right time can lower your monthly EV cost by $10–$18 vs. standard rate. Charging at the wrong time can cost you more. <strong>Your behavior is the variable.</strong></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tips -->
+  <section id="tips">
+    <div class="container">
+      <div class="tips-header">
+        <div class="section-label">How to succeed</div>
+        <h2>Three habits that protect your grade</h2>
+        <p>One behavioral shift is all it takes to move from a D to an A.</p>
+      </div>
+      <div class="tips-grid">
+        <div class="tip-card">
+          <div class="tip-number">01</div>
+          <h3>Plug in after 11pm</h3>
+          <p>The preferred window runs 11pm to 7am. Start your charge at bedtime and wake up to a full battery at the lowest possible rate.</p>
+          <div class="tip-time-badge">11:00 pm – 7:00 am</div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-number">02</div>
+          <h3>Skip the midday top-up</h3>
+          <p>Even a short charge at peak hours adds up. If you need to top up during the day, keep it brief and make up the difference overnight.</p>
+          <div style="margin-top:0.65rem;"><span class="badge badge-amber">Minimize 9am – 11pm charging</span></div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-number">03</div>
+          <h3>Use your car's scheduler</h3>
+          <p>Most EVs let you set a charge start time in the vehicle app. Set it for 11:05pm once and the savings happen automatically every night.</p>
+          <div style="margin-top:0.65rem;"><span class="badge badge-blue">Set it once, save every month</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section id="cta">
+    <div class="cta-inner">
+      <div class="section-label" style="color:#334155;">Ready to save?</div>
+      <h2 style="color:#fff; margin-bottom:0.85rem;">Start saving on every charge</h2>
+      <p style="color:#64748B; margin-bottom:2rem; font-size:0.95rem;">Join ChargeSmart and take control of your EV charging costs. Enrollment takes minutes — savings start on your next billing cycle.</p>
+      <div class="cta-btn-group">
+        <a href="#" class="btn-cta-primary">Enroll in ChargeSmart →</a>
+        <a href="#" class="btn-cta-ghost">Learn more</a>
+      </div>
+      <p class="cta-disclaimer">This tool provides estimated costs based on typical usage and simplified assumptions. Actual savings may vary based on individual usage patterns, specific electricity rates, and program details. ChargeSmart is available to eligible Ameren Illinois customers.</p>
+    </div>
+  </section>
+
+</div><!-- /screen-calculator -->
+
+
+<!-- ================================================
+     SCREEN 2: DASHBOARD
+     ================================================ -->
+<div id="screen-dashboard" class="screen">
+
+  <!-- Header -->
+  <div class="dash-header">
+    <div class="dash-header-inner">
+      <div class="dash-user">
+        <div class="dash-avatar">SM</div>
+        <div>
+          <div class="dash-name">Sarah M.</div>
+          <div class="dash-status">
+            <span class="dash-status-dot"></span>
+            ChargeSmart member · Active
+          </div>
+        </div>
+      </div>
+      <div class="dash-meta">
+        <span class="dash-period">April 2026 · 18 days in</span>
+        <span class="badge badge-green">On track</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-body">
+
+    <!-- Metric row -->
+    <div class="dash-metrics">
+      <div class="metric-card">
+        <div class="metric-label">Current grade</div>
+        <div class="metric-value green">A</div>
+        <div class="metric-sub">Charging champion</div>
+        <div class="metric-delta up">↑ Up from B last month</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Cost to date</div>
+        <div class="metric-value">$8.14</div>
+        <div class="metric-sub">18 of 30 days</div>
+        <div class="metric-delta flat">On pace</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Projected savings</div>
+        <div class="metric-value green">$13.20</div>
+        <div class="metric-sub">vs. standard rate this month</div>
+        <div class="metric-delta up">↑ Best month yet</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Off-peak rate</div>
+        <div class="metric-value blue">83%</div>
+        <div class="metric-sub">of charges this month</div>
+        <div class="metric-delta up">↑ 12% vs. last month</div>
+      </div>
+    </div>
+
+    <!-- Cost projection bar -->
+    <div class="cost-projection">
+      <div class="projection-header">
+        <div>
+          <div class="projection-title">Month progress — April 2026</div>
+          <div class="projection-subtitle">18 days completed · 12 days remaining</div>
+        </div>
+        <div class="projection-values">
+          <div class="proj-val-group">
+            <div class="proj-val-label">To date</div>
+            <div class="proj-val slate">$8.14</div>
+          </div>
+          <div class="proj-val-group">
+            <div class="proj-val-label">Projected total</div>
+            <div class="proj-val green">$13.60</div>
+          </div>
+        </div>
+      </div>
+      <div class="proj-bar-track">
+        <div class="proj-bar-fill"></div>
+      </div>
+      <div class="proj-bar-label">
+        <span>Month start</span>
+        <span>Today (day 18)</span>
+        <span>Month end</span>
+      </div>
+    </div>
+
+    <!-- Main 2-col grid -->
+    <div class="dash-main">
+
+      <!-- Grade + charge breakdown card -->
+      <div class="dash-grade-card">
+        <div class="dash-grade-top">
+          <div class="dash-grade-badge">A</div>
+          <div class="dash-grade-info">
+            <div class="dash-grade-title">Charging champion</div>
+            <div class="dash-grade-sub">You're on track for your best month yet. 15 of 18 charges happened during the preferred overnight window.</div>
+          </div>
+        </div>
+        <div class="dash-grade-body">
+          <div class="section-label" style="margin-bottom:0.85rem;">This month's charge split</div>
+          <div class="charge-bar-row">
+            <div class="charge-bar-label">
+              <span class="charge-bar-label-text">🌙 Off-peak (overnight)</span>
+              <span class="charge-bar-label-pct" style="color:var(--blue);">83%</span>
+            </div>
+            <div class="charge-bar-track">
+              <div class="charge-bar-fill blue" style="width:83%"></div>
+            </div>
+          </div>
+          <div class="charge-bar-row">
+            <div class="charge-bar-label">
+              <span class="charge-bar-label-text">☀️ Daytime (peak)</span>
+              <span class="charge-bar-label-pct" style="color:var(--orange);">17%</span>
+            </div>
+            <div class="charge-bar-track">
+              <div class="charge-bar-fill orange" style="width:17%"></div>
+            </div>
+          </div>
+
+          <div class="week-chart">
+            <div class="week-chart-label">Last 7 days</div>
+            <div class="week-bars">
+              <div class="week-bar-wrap">
+                <div class="week-bar offpeak" style="height:60px"></div>
+                <div class="week-day">M</div>
+              </div>
+              <div class="week-bar-wrap">
+                <div class="week-bar offpeak" style="height:52px"></div>
+                <div class="week-day">T</div>
+              </div>
+              <div class="week-bar-wrap">
+                <div class="week-bar peak" style="height:38px"></div>
+                <div class="week-day">W</div>
+              </div>
+              <div class="week-bar-wrap">
+                <div class="week-bar offpeak" style="height:56px"></div>
+                <div class="week-day">T</div>
+              </div>
+              <div class="week-bar-wrap">
+                <div class="week-bar none" style="height:8px"></div>
+                <div class="week-day">F</div>
+              </div>
+              <div class="week-bar-wrap">
+                <div class="week-bar offpeak" style="height:64px"></div>
+                <div class="week-day">S</div>
+              </div>
+              <div class="week-bar-wrap">
+                <div class="week-bar offpeak" style="height:48px"></div>
+                <div class="week-day">S</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; gap:1rem; margin-top:0.85rem; font-size:0.72rem; color:var(--slate-400);">
+            <span style="display:flex; align-items:center; gap:5px;"><span style="width:10px; height:10px; border-radius:2px; background:var(--blue); display:inline-block;"></span> Off-peak</span>
+            <span style="display:flex; align-items:center; gap:5px;"><span style="width:10px; height:10px; border-radius:2px; background:var(--orange); display:inline-block;"></span> Peak</span>
+            <span style="display:flex; align-items:center; gap:5px;"><span style="width:10px; height:10px; border-radius:2px; background:var(--slate-200); display:inline-block;"></span> No charge</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coaching messages -->
+      <div class="dash-messages">
+
+        <!-- Positive message -->
+        <div class="msg-card">
+          <div class="msg-card-header">
+            <div class="msg-card-icon">⚡</div>
+            <div>
+              <div class="msg-card-from">ChargeSmart Coach</div>
+            </div>
+            <div class="msg-card-time">Today, 7:12 am</div>
+          </div>
+          <div class="msg-bubbles">
+            <div class="bubble inbound positive">
+              Great week, Sarah! 🌙 You charged overnight 6 out of 7 nights — that's a Grade A performance. You're on track to save about <strong>$13.20</strong> this month compared to the standard rate. Keep doing what you're doing and you'll finish strong.
+              <span class="bubble-time">Delivered 7:12 am</span>
+            </div>
+            <div class="bubble inbound" style="background:var(--slate-50);">
+              Your $4 program credit has been applied to your account for this month. 
+              <span class="bubble-time">Delivered 7:12 am</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warning message -->
+        <div class="msg-card">
+          <div class="msg-card-header">
+            <div class="msg-card-icon">⚡</div>
+            <div>
+              <div class="msg-card-from">ChargeSmart Coach</div>
+            </div>
+            <div class="msg-card-time">Wed Apr 16, 2:30 pm</div>
+          </div>
+          <div class="msg-bubbles">
+            <div class="bubble inbound warning">
+              Hey Sarah — we noticed 3 daytime charges this week, including one on Wednesday around 2pm. Your grade slipped to a <strong>B</strong> mid-week and your projected savings dipped by about <strong>$6</strong>.
+              <span class="bubble-time">Delivered 2:30 pm</span>
+            </div>
+            <div class="bubble inbound" style="background:var(--slate-50);">
+              No worries — tonight's a great chance to get back on track. Plug in after 11pm and you'll start recovering those savings right away. You've got 12 days left in the month. 💪
+              <span class="bubble-time">Delivered 2:30 pm</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /dash-main -->
+  </div><!-- /dash-body -->
+</div><!-- /screen-dashboard -->
+
+
+<script>
+/* =============================================
+   EDITABLE ASSUMPTIONS
+   ============================================= */
+const ASSUMPTIONS = {
+  offPeakRate: 0.09,
+  peakRate:    0.20,
+  baseRate:    0.13,
+  efficiency:  3.2,
+  miles:       1000,
+  credit:      4.00,
+  splits: {
+    optimal:   1.00,
+    optimized: 0.85,
+    mixed:     0.50,
+    poor:      0.25
+  },
+  applianceSavings: {
+    dishwasher: 4,
+    laundry:    7,
+    thermostat: 9,
+    water:      5
+  }
+};
+
+const GRADES = {
+  optimized: {
+    letter: 'A', bgClass: 'gbg-A', badgeClass: 'gb-A',
+    title:    'Charging champion',
+    subtitle: 'You\'re using the program the way it\'s designed. Night charging is where savings happen.',
+    nudge:    'Top ChargeSmart members hit Grade A every month.'
+  },
+  mixed: {
+    letter: 'C', bgClass: 'gbg-C', badgeClass: 'gb-C',
+    title:    'Room to improve',
+    subtitle: 'You\'re capturing some savings — shifting more charges to overnight could earn you a higher grade.',
+    nudge:    'Most members who try overnight scheduling move up within a month.'
+  },
+  poor: {
+    letter: 'D', bgClass: 'gbg-D', badgeClass: 'gb-D',
+    title:    'Savings left on the table',
+    subtitle: 'Daytime charging is offsetting your credit. One schedule change at night could flip this around.',
+    nudge:    'The difference between a D and an A is often just a timer setting.'
+  }
+};
+
+const CTA_COPY = {
+  optimized: '<strong>You\'re on track.</strong> Lock in your Grade A savings by enrolling today.',
+  mixed:     '<strong>You could do better.</strong> Enroll and set a charge timer to move up a grade.',
+  poor:      '<strong>One change makes a big difference.</strong> Enroll and schedule overnight charging to turn this around.'
+};
+
+let state = {
+  miles:        ASSUMPTIONS.miles,
+  behavior:     'optimized',
+  efficiency:   ASSUMPTIONS.efficiency,
+  baseRate:     ASSUMPTIONS.baseRate,
+  bonusTotal:   0
+};
+
+/* ── Calculation ── */
+function calc(miles, behaviorKey, efficiency, baseRate) {
+  const split      = ASSUMPTIONS.splits[behaviorKey];
+  const totalKwh   = miles / efficiency;
+  const offPeakKwh = totalKwh * split;
+  const peakKwh    = totalKwh * (1 - split);
+  const offCost    = offPeakKwh * ASSUMPTIONS.offPeakRate;
+  const pkCost     = peakKwh   * ASSUMPTIONS.peakRate;
+  const chargeCost = offCost + pkCost;
+  const baseCost   = totalKwh  * baseRate;
+  const netCost    = chargeCost - ASSUMPTIONS.credit;
+  const savings    = baseCost - netCost;
+  return {
+    totalKwh:    r1(totalKwh),
+    offPeakCost: r2(offCost),
+    peakCost:    r2(pkCost),
+    baseCost:    r2(baseCost),
+    netCost:     r2(netCost),
+    savings:     r2(savings),
+    annualCost:  Math.round(netCost * 12)
+  };
+}
+
+function r1(n) { return Math.round(n * 10) / 10; }
+function r2(n) { return Math.round(n * 100) / 100; }
+function fmt(n)  { return (n < 0 ? '-' : '') + '$' + Math.abs(n).toFixed(2); }
+function fmtA(n) { return (n < 0 ? '-' : '') + '$' + Math.abs(Math.round(n)).toLocaleString(); }
+
+/* ── UI Update ── */
+function updateUI() {
+  const r      = calc(state.miles, state.behavior, state.efficiency, state.baseRate);
+  const bestR  = calc(state.miles, 'optimized', state.efficiency, state.baseRate);
+  const midR   = calc(state.miles, 'mixed',     state.efficiency, state.baseRate);
+  const worstR = calc(state.miles, 'poor',      state.efficiency, state.baseRate);
+  const optR   = calc(state.miles, 'optimal',   state.efficiency, state.baseRate);
+
+  /* Grade */
+  const g = GRADES[state.behavior];
+  const banner = document.getElementById('gradeBanner');
+  banner.className = 'grade-banner ' + g.bgClass;
+  const badge = document.getElementById('gradeBadge');
+  badge.className = 'grade-badge ' + g.badgeClass;
+  badge.textContent = g.letter;
+  document.getElementById('gradeTitle').textContent    = g.title;
+  document.getElementById('gradeSubtitle').textContent = g.subtitle;
+  document.getElementById('gradeNudge').textContent    = g.nudge;
+
+  /* Breakdown */
+  document.getElementById('kwhDisplay').textContent  = r.totalKwh.toFixed(1) + ' kWh';
+  document.getElementById('offpeakCost').textContent = fmt(r.offPeakCost);
+  document.getElementById('peakCost').textContent    = fmt(r.peakCost);
+  document.getElementById('baseCost').textContent    = fmt(r.baseCost);
+  document.getElementById('totalMonthly').textContent = fmt(r.netCost);
+  document.getElementById('totalAnnual').textContent  = fmtA(r.annualCost) + '/yr';
+
+  const savEl = document.getElementById('savingsLine');
+  if (r.savings > 0) {
+    savEl.textContent = 'Saving ' + fmt(r.savings) + '/month vs. standard rate';
+    savEl.className = 'result-savings-line positive';
+  } else if (r.savings < 0) {
+    savEl.textContent = 'Paying ' + fmt(Math.abs(r.savings)) + ' more than standard rate';
+    savEl.className = 'result-savings-line negative';
+  } else {
+    savEl.textContent = 'Same as standard rate';
+    savEl.className = 'result-savings-line';
+  }
+
+  document.getElementById('inlineCTAText').innerHTML = CTA_COPY[state.behavior];
+
+  /* Optimal ceiling */
+  document.getElementById('optimalMonthly').textContent = fmt(optR.netCost);
+  document.getElementById('optimalAnnual').textContent  = fmtA(optR.annualCost) + '/yr';
+
+  /* Scenarios */
+  document.getElementById('scenBestCost').textContent    = fmt(bestR.netCost);
+  document.getElementById('scenBestAnnual').textContent  = fmtA(bestR.annualCost) + '/year';
+  document.getElementById('scenMidCost').textContent     = fmt(midR.netCost);
+  document.getElementById('scenMidAnnual').textContent   = fmtA(midR.annualCost) + '/year';
+  document.getElementById('scenWorstCost').textContent   = fmt(worstR.netCost);
+  document.getElementById('scenWorstAnnual').textContent = fmtA(worstR.annualCost) + '/year';
+
+  const maxCost = Math.max(bestR.netCost, midR.netCost, worstR.netCost, 0.01);
+  document.getElementById('scenBestBar').style.width  = Math.max((bestR.netCost  / maxCost) * 100, 6).toFixed(0) + '%';
+  document.getElementById('scenMidBar').style.width   = Math.max((midR.netCost   / maxCost) * 100, 6).toFixed(0) + '%';
+  document.getElementById('scenWorstBar').style.width = '100%';
+
+  ['scenBest','scenMid','scenWorst'].forEach(id => {
+    document.getElementById(id).classList.remove('active-scenario');
+    const t = document.getElementById(id).querySelector('.current-you-tag');
+    if (t) t.remove();
+  });
+  const activeMap = { optimized: 'scenBest', mixed: 'scenMid', poor: 'scenWorst' };
+  const activeCard = document.getElementById(activeMap[state.behavior]);
+  activeCard.classList.add('active-scenario');
+  const tag = document.createElement('div');
+  tag.className = 'current-you-tag';
+  tag.textContent = 'You';
+  activeCard.appendChild(tag);
+
+  const labels = { optimized: 'Mostly overnight (Grade A)', mixed: 'Day & night mix (Grade C)', poor: 'Mostly daytime (Grade D)' };
+  document.getElementById('youAreHereText').textContent =
+    'Your selection: "' + labels[state.behavior] + '" — ' + fmt(r.netCost) + '/month · ' + fmtA(r.annualCost) + '/year.';
+
+  /* Combined savings */
+  updateCombined(r.savings);
+}
+
+function updateCombined(evSavings) {
+  const evS = Math.max(evSavings, 0);
+  const total = evS + state.bonusTotal;
+  const annualTotal = Math.round(total * 12);
+  document.getElementById('combinedSavings').textContent = fmt(total) + '/month · ' + fmtA(annualTotal) + '/year';
+  document.getElementById('combinedSub').textContent = 'EV program (' + fmt(evS) + ') + appliances (' + fmt(state.bonusTotal) + ')';
+}
+
+/* ── Appliance toggles ── */
+function toggleAppliance(card) {
+  card.classList.toggle('toggled');
+  const saving = parseInt(card.dataset.saving);
+  state.bonusTotal += card.classList.contains('toggled') ? saving : -saving;
+  document.getElementById('bonusTotal').textContent = '$' + state.bonusTotal;
+  const r = calc(state.miles, state.behavior, state.efficiency, state.baseRate);
+  updateCombined(r.savings);
+}
+
+/* ── Screen switching ── */
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active-tab'));
+  const tabEl = document.getElementById('tab-' + (name === 'calculator' ? 'calc' : 'dash'));
+  if (tabEl) tabEl.classList.add('active-tab');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.getElementById('progressBar').style.width = '0%';
+}
+
+/* ── Event listeners ── */
+document.getElementById('milesSlider').addEventListener('input', function() {
+  state.miles = parseInt(this.value);
+  document.getElementById('milesDisplay').textContent = parseInt(this.value).toLocaleString() + ' mi';
+  updateUI();
+});
+
+document.querySelectorAll('.behavior-option').forEach(function(opt) {
+  opt.addEventListener('click', function() {
+    state.behavior = this.dataset.behavior;
+    document.querySelectorAll('.behavior-option').forEach(o => { o.className = 'behavior-option'; });
+    const cMap = { optimized: 'sel-blue', mixed: 'sel-amber', poor: 'sel-orange' };
+    this.classList.add(cMap[state.behavior]);
+    updateUI();
+  });
+});
+
+document.getElementById('baseRate').addEventListener('input', function() {
+  const v = parseFloat(this.value);
+  if (!isNaN(v) && v > 0) { state.baseRate = v; updateUI(); }
+});
+
+document.getElementById('efficiency').addEventListener('input', function() {
+  const v = parseFloat(this.value);
+  if (!isNaN(v) && v > 0) { state.efficiency = v; updateUI(); }
+});
+
+function toggleAdvanced() {
+  document.getElementById('advancedPanel').classList.toggle('open');
+  document.getElementById('advancedToggle').classList.toggle('open');
+}
+
+window.addEventListener('scroll', function() {
+  const st = document.documentElement.scrollTop || document.body.scrollTop;
+  const sh = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+  document.getElementById('progressBar').style.width = (sh > 0 ? (st / sh) * 100 : 0).toFixed(1) + '%';
+});
+
+/* ── Init ── */
+updateUI();
+</script>
+
+
+<!-- ================================================
+     SCREEN 3: CUSTOMER JOURNEY
+     ================================================ -->
+<div id="screen-journey" class="screen">
+  <div class="journey-wrap">
+
+    <div class="journey-page-header">
+      <div class="section-label">Campaign touchpoint map</div>
+      <h2>How customers find ChargeSmart</h2>
+      <p>From first awareness to enrollment — the key moments where we meet EV owners and direct them to the calculator. Each card shows the channel, the message context, and the call to action.</p>
+    </div>
+
+    <div class="journey-phase">
+      <div class="journey-phase-label">Awareness &amp; discovery</div>
+      <div class="journey-phase-line"></div>
+      <div class="journey-phase-label">Consideration</div>
+      <div class="journey-phase-line"></div>
+      <div class="journey-phase-label">Action</div>
+    </div>
+
+    <div class="journey-flow">
+
+      <!-- 1. EV Dealership -->
+      <div class="tp-card c-slate">
+        <div class="tp-card-top">
+          <div class="tp-channel-tag">Physical &middot; In-person</div>
+          <div class="tp-icon">&#x1F697;</div>
+          <div class="tp-title">EV Dealership</div>
+          <div class="tp-desc">Point-of-sale moment. Customers are buying or test-driving an EV and thinking about running costs for the first time.</div>
+        </div>
+        <div class="tp-card-bottom">
+          <div class="tp-cta-label">Call to action</div>
+          <div class="tp-cta-text">Counter card with QR code</div>
+          <div class="qr-block">
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="4" fill="#F1F5F9"/><rect x="6" y="6" width="10" height="10" rx="1" fill="#334155"/><rect x="8" y="8" width="6" height="6" rx="0.5" fill="#F1F5F9"/><rect x="9" y="9" width="4" height="4" fill="#334155"/><rect x="20" y="6" width="10" height="10" rx="1" fill="#334155"/><rect x="22" y="8" width="6" height="6" rx="0.5" fill="#F1F5F9"/><rect x="23" y="9" width="4" height="4" fill="#334155"/><rect x="6" y="20" width="10" height="10" rx="1" fill="#334155"/><rect x="8" y="22" width="6" height="6" rx="0.5" fill="#F1F5F9"/><rect x="9" y="23" width="4" height="4" fill="#334155"/><rect x="20" y="20" width="4" height="4" fill="#334155"/><rect x="26" y="20" width="4" height="4" fill="#334155"/><rect x="20" y="26" width="4" height="4" fill="#334155"/><rect x="26" y="26" width="4" height="4" fill="#334155"/></svg>
+            <div class="qr-label">"Scan to see how much you'll save charging at home"</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="journey-arrow"><svg width="28" height="16" viewBox="0 0 28 16" fill="none"><path d="M0 8h24M18 2l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <!-- 2. Direct Mail -->
+      <div class="tp-card c-amber">
+        <div class="tp-card-top">
+          <div class="tp-channel-tag">Direct mail</div>
+          <div class="tp-icon">&#x2709;&#xFE0F;</div>
+          <div class="tp-title">Bill insert &amp; postcard</div>
+          <div class="tp-desc">Mailed to Ameren customers who registered an EV or requested EV rate info. High-intent, warm audience.</div>
+        </div>
+        <div class="tp-card-bottom">
+          <div class="tp-cta-label">Call to action</div>
+          <div class="tp-cta-text">"Your nights just got more valuable. See your savings."</div>
+          <div class="qr-block">
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="4" fill="#FEF3C7"/><rect x="6" y="6" width="10" height="10" rx="1" fill="#92400E"/><rect x="8" y="8" width="6" height="6" rx="0.5" fill="#FEF3C7"/><rect x="9" y="9" width="4" height="4" fill="#92400E"/><rect x="20" y="6" width="10" height="10" rx="1" fill="#92400E"/><rect x="22" y="8" width="6" height="6" rx="0.5" fill="#FEF3C7"/><rect x="23" y="9" width="4" height="4" fill="#92400E"/><rect x="6" y="20" width="10" height="10" rx="1" fill="#92400E"/><rect x="8" y="22" width="6" height="6" rx="0.5" fill="#FEF3C7"/><rect x="9" y="23" width="4" height="4" fill="#92400E"/><rect x="20" y="20" width="4" height="4" fill="#92400E"/><rect x="26" y="20" width="4" height="4" fill="#92400E"/><rect x="20" y="26" width="4" height="4" fill="#92400E"/><rect x="26" y="26" width="4" height="4" fill="#92400E"/></svg>
+            <div class="qr-label">QR + short vanity URL on reverse</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="journey-arrow"><svg width="28" height="16" viewBox="0 0 28 16" fill="none"><path d="M0 8h24M18 2l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <!-- 3. Geo display -->
+      <div class="tp-card c-teal">
+        <div class="tp-card-top">
+          <div class="tp-channel-tag">Digital display &middot; Geo</div>
+          <div class="tp-icon">&#x1F4CD;</div>
+          <div class="tp-title">Geo-targeted display</div>
+          <div class="tp-desc">Served near dealerships, public charging stations, and within the Ameren service territory boundary. Right place, right moment.</div>
+        </div>
+        <div class="tp-card-bottom">
+          <div class="tp-cta-label">Call to action</div>
+          <div class="tp-cta-text" style="color:#0F766E;">"Charging tonight? You could be saving. See your number &rarr;"</div>
+        </div>
+      </div>
+
+      <div class="journey-arrow"><svg width="28" height="16" viewBox="0 0 28 16" fill="none"><path d="M0 8h24M18 2l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <!-- 4. Social -->
+      <div class="tp-card c-blue">
+        <div class="tp-card-top">
+          <div class="tp-channel-tag">Social media &middot; Paid</div>
+          <div class="tp-icon">&#x1F4F1;</div>
+          <div class="tp-title">Social ad</div>
+          <div class="tp-desc">Facebook and Instagram placements targeting EV owners and recent EV buyers in the Ameren Illinois service area.</div>
+        </div>
+        <div class="tp-card-bottom">
+          <div class="tp-cta-label">Call to action</div>
+          <div class="tp-cta-text">"Most EV owners don't know this trick. Calculate your savings in 30 seconds."</div>
+        </div>
+      </div>
+
+      <div class="journey-arrow"><svg width="28" height="16" viewBox="0 0 28 16" fill="none"><path d="M0 8h24M18 2l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <!-- 5. Utility email -->
+      <div class="tp-card c-navy">
+        <div class="tp-card-top">
+          <div class="tp-channel-tag">Email &middot; Existing customers</div>
+          <div class="tp-icon">&#x1F3E0;</div>
+          <div class="tp-title">Utility triggered email</div>
+          <div class="tp-desc">Triggered to Ameren customers who recently registered an EV or added a home charger. The warmest possible audience.</div>
+        </div>
+        <div class="tp-card-bottom">
+          <div class="tp-cta-label">Call to action</div>
+          <div class="tp-cta-text">"We noticed you have an EV. Here's how to save on every charge."</div>
+        </div>
+      </div>
+
+      <div class="journey-arrow"><svg width="28" height="16" viewBox="0 0 28 16" fill="none"><path d="M0 8h24M18 2l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <!-- 6. Calculator destination -->
+      <div class="tp-card c-green destination">
+        <div class="dest-badge">Destination</div>
+        <div class="tp-card-top" style="padding-top:1.75rem;">
+          <div class="tp-channel-tag">Interactive tool &middot; Web</div>
+          <div class="tp-icon">&#x26A1;</div>
+          <div class="tp-title">ChargeSmart Calculator</div>
+          <div class="tp-desc">All channels land here. Users see their personalized savings number, earn a grade, and enroll in one seamless experience.</div>
+        </div>
+        <div class="tp-card-bottom">
+          <div class="tp-cta-label">Call to action</div>
+          <div class="tp-cta-text">"Enroll in ChargeSmart &mdash; savings start this billing cycle."</div>
+        </div>
+      </div>
+
+    </div><!-- /journey-flow -->
+
+    <div class="journey-legend">
+      <div class="legend-item">
+        <div class="legend-dot blue"></div>
+        <div>
+          <div class="legend-title">Digital channels</div>
+          <div class="legend-desc">Social, display, and email click-through directly to the calculator. Trackable via UTM parameters per channel.</div>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot amber"></div>
+        <div>
+          <div class="legend-title">Physical channels</div>
+          <div class="legend-desc">Dealership cards and direct mail use QR codes plus a short vanity URL as a fallback for non-scanners.</div>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot green"></div>
+        <div>
+          <div class="legend-title">Single destination</div>
+          <div class="legend-desc">Every touchpoint drives to the same calculator URL. One experience, consistent grade logic, one enrollment flow.</div>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot slate"></div>
+        <div>
+          <div class="legend-title">Geo-targeting note</div>
+          <div class="legend-desc">Display ads can be layered with radius targeting around dealerships and public chargers within the service territory.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-note">
+      <strong>Prototype note:</strong> CTAs, QR codes, and URLs shown here are illustrative placeholders. Final campaign links, tracking parameters, and enrollment URLs to be confirmed by the program team before launch.
+    </div>
+
+  </div>
+</div><!-- /screen-journey -->
+
+<script>
+/* Patch showScreen to handle the 3rd tab */
+const _orig = showScreen;
+showScreen = function(name) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('screen-' + name).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active-tab'); });
+  var idMap = { calculator: 'tab-calc', dashboard: 'tab-dash', journey: 'tab-journey' };
+  var tabEl = document.getElementById(idMap[name]);
+  if (tabEl) tabEl.classList.add('active-tab');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.getElementById('progressBar').style.width = '0%';
+};
+</script>
+
+</body>
+</html>
