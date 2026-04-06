@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChargeSmart — EV Charging Savings Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* =============================================
+   EDITABLE ASSUMPTIONS — all program values here
+   ============================================= */
+:root {
+  --page-bg:    #F1F5F9;
+  --surface:    #FFFFFF;
+  --surface-2:  #F8FAFC;
+  --navy:       #0F2447;
+  --navy-mid:   #1A3A6B;
+  --navy-light: #EEF2FF;
+  --blue:       #2563EB;
+  --blue-light: #DBEAFE;
+  --blue-mid:   #93C5FD;
+  --blue-dark:  #1D4ED8;
+  --green:      #16A34A;
+  --green-light:#DCFCE7;
+  --green-dark: #14532D;
+  --teal:       #0D9488;
+  --teal-light: #CCFBF1;
+  --amber:      #D97706;
+  --amber-light:#FEF3C7;
+  --amber-dark: #78350F;
+  --orange:     #EA580C;
+  --orange-light:#FFF7ED;
+  --red:        #DC2626;
+  --red-light:  #FEE2E2;
+  --red-dark:   #991B1B;
+  --slate-100:  #F1F5F9;
+  --slate-200:  #E2E8F0;
+  --slate-300:  #CBD5E1;
+  --slate-400:  #94A3B8;
+  --slate-500:  #64748B;
+  --slate-600:  #475569;
+  --slate-700:  #334155;
+  --slate-800:  #1E293B;
+  --slate-900:  #0F172A;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --font:      'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 2px 8px rgba(0,0,0,0.04);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.08), 0 6px 20px rgba(0,0,0,0.05);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--page-bg); color: var(--slate-800); line-height: 1.6; font-size: 16px; -webkit-font-smoothing: antialiased; }
+h1,h2,h3,h4 { line-height: 1.2; font-weight: 600; color: var(--slate-900); }
+h1 { font-size: clamp(1.7rem,4vw,2.5rem); }
+h2 { font-size: clamp(1.4rem,3vw,1.9rem); }
+h3 { font-size: 1rem; font-weight: 600; }
+p  { line-height: 1.7; }
+.container { max-width: 980px; margin: 0 auto; padding: 0 1.5rem; }
+section { padding: 4.5rem 0; }
+.card { background: var(--surface); border-radius: var(--radius-lg); padding: 1.75rem; box-shadow: var(--shadow-sm); border: 1px solid var(--slate-200); }
+.divider { height: 1px; background: var(--slate-100); margin: 1.25rem 0; }
+.section-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.13em; text-transform: uppercase; color: var(--slate-400); margin-bottom: 0.55rem; }
+.badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 3px 9px; border-radius: 100px; }
+.badge-blue  { background: var(--blue-light);  color: var(--blue-dark); }
+.badge-green { background: var(--green-light); color: var(--green-dark); }
+.badge-amber { background: var(--amber-light); color: var(--amber-dark); }
+.badge-teal  { background: var(--teal-light);  color: #115E59; }
+.badge-navy  { background: var(--navy-light);  color: var(--navy-mid); }
+
+/* Progress bar */
+.progress-bar { position: fixed; top: 0; left: 0; height: 2px; background: var(--green); z-index: 300; transition: width 0.1s; width: 0%; }
+
+/* Router — screens managed by JS, not CSS */
+
+/* ── Nav ── */
+.site-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 200; background: rgba(255,255,255,0.93); backdrop-filter: blur(14px); border-bottom: 1px solid var(--slate-200); box-shadow: var(--shadow-xs); }
+.nav-inner { display: flex; align-items: center; justify-content: space-between; max-width: 980px; margin: 0 auto; padding: 0.8rem 1.5rem; }
+.nav-logo { font-weight: 600; font-size: 0.95rem; color: var(--navy); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+.nav-logo-badge { font-size: 0.65rem; font-weight: 600; padding: 2px 7px; background: var(--navy-light); color: var(--navy-mid); border-radius: 100px; letter-spacing: 0.06em; }
+.nav-links { display: flex; align-items: center; gap: 0.25rem; }
+.nav-tab { font-size: 0.82rem; font-weight: 500; color: var(--slate-500); padding: 0.4rem 0.85rem; border-radius: var(--radius-md); border: none; background: none; cursor: pointer; font-family: var(--font); transition: color 0.15s, background 0.15s; }
+.nav-tab:hover { color: var(--slate-800); background: var(--slate-100); }
+.nav-tab.active-tab { color: var(--blue); background: var(--blue-light); }
+.nav-cta { font-size: 0.82rem; font-weight: 600; color: #fff; background: var(--blue); padding: 0.42rem 1rem; border-radius: var(--radius-sm); text-decoration: none; transition: background 0.15s; border: none; cursor: pointer; font-family: var(--font); }
+.nav-cta:hover { background: var(--blue-dark); }
+@media (max-width: 600px) { .nav-links { display: none; } }
+
+/* ============================================
+   SCREEN 1 — CALCULATOR
+   ============================================ */
+
+/* Orient strip */
+#orient { background: var(--surface); border-bottom: 1px solid var(--slate-200); padding: 7rem 0 2.5rem; text-align: center; }
+.orient-inner { max-width: 580px; margin: 0 auto; padding: 0 1.5rem; }
+#orient h1 { color: var(--navy); font-weight: 300; letter-spacing: -0.02em; margin-bottom: 0.8rem; }
+#orient h1 strong { font-weight: 700; color: var(--blue); }
+.orient-sub { color: var(--slate-500); font-size: 1rem; line-height: 1.65; }
+.orient-sub strong { color: var(--slate-700); }
+
+/* Calculator section */
+#calculator { background: var(--page-bg); padding: 3rem 0 2rem; }
+.calc-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+@media (max-width: 720px) { .calc-layout { grid-template-columns: 1fr; } }
+
+/* Inputs */
+.input-group { margin-bottom: 1.6rem; }
+.input-group:last-child { margin-bottom: 0; }
+.input-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.7rem; }
+.input-label-text  { font-size: 0.87rem; font-weight: 500; color: var(--slate-700); }
+.input-label-value { font-size: 0.95rem; font-weight: 600; color: var(--navy); font-family: var(--font-mono); }
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 5px; border-radius: 100px; background: var(--slate-200); outline: none; cursor: pointer; margin: 0.4rem 0; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 3px solid #fff; box-shadow: 0 0 0 2px var(--blue); transition: transform 0.1s; }
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+.range-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--slate-400); margin-top: 4px; }
+
+/* Behavior selector */
+.behavior-selector { display: flex; flex-direction: column; gap: 0.5rem; }
+.behavior-option { display: flex; align-items: center; gap: 0.75rem; padding: 0.8rem 1rem; border-radius: var(--radius-md); border: 1.5px solid var(--slate-200); cursor: pointer; transition: border-color 0.15s, background 0.15s; background: var(--surface); }
+.behavior-option:hover { border-color: var(--slate-300); background: var(--page-bg); }
+.behavior-option.sel-blue   { border-color: var(--blue);   background: #EFF6FF; }
+.behavior-option.sel-amber  { border-color: var(--amber);  background: #FFFBEB; }
+.behavior-option.sel-orange { border-color: var(--orange); background: var(--orange-light); }
+.behavior-dot { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--slate-300); flex-shrink: 0; transition: border-color 0.15s, background 0.15s; }
+.behavior-option.sel-blue   .behavior-dot { background: var(--blue);   border-color: var(--blue); }
+.behavior-option.sel-amber  .behavior-dot { background: var(--amber);  border-color: var(--amber); }
+.behavior-option.sel-orange .behavior-dot { background: var(--orange); border-color: var(--orange); }
+.behavior-text { flex: 1; }
+.behavior-title    { font-size: 0.86rem; font-weight: 500; color: var(--slate-800); }
+.behavior-subtitle { font-size: 0.73rem; color: var(--slate-400); margin-top: 1px; }
+
+/* Advanced toggle */
+.advanced-toggle { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; color: var(--blue); font-weight: 500; cursor: pointer; border: none; background: none; padding: 0; font-family: var(--font); margin-top: 0.25rem; }
+.advanced-toggle svg { transition: transform 0.2s; }
+.advanced-toggle.open svg { transform: rotate(180deg); }
+.advanced-panel { margin-top: 1rem; display: none; }
+.advanced-panel.open { display: block; }
+.advanced-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.adv-field label { display: block; font-size: 0.76rem; color: var(--slate-600); margin-bottom: 0.3rem; font-weight: 500; }
+.adv-field input[type="number"] { width: 100%; padding: 0.48rem 0.7rem; border: 1.5px solid var(--slate-200); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.86rem; color: var(--slate-800); background: var(--surface); outline: none; transition: border-color 0.15s; }
+.adv-field input[type="number"]:focus { border-color: var(--blue); }
+
+/* Results card */
+.results-card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--slate-200); overflow: hidden; box-shadow: var(--shadow-md); display: flex; flex-direction: column; }
+
+/* Grade banner */
+.grade-banner { padding: 1.4rem 1.6rem 1.2rem; border-bottom: 1px solid var(--slate-100); display: flex; align-items: center; gap: 1.1rem; transition: background 0.3s; }
+.grade-banner.gbg-A { background: #F0FDF4; }
+.grade-banner.gbg-C { background: #FFFBEB; }
+.grade-banner.gbg-D { background: #FEF2F2; }
+.grade-badge { width: 60px; height: 60px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.9rem; font-weight: 700; font-family: var(--font-mono); flex-shrink: 0; transition: background 0.3s, color 0.3s; }
+.gb-A { background: var(--green-light); color: var(--green-dark); }
+.gb-C { background: var(--amber-light); color: var(--amber-dark); }
+.gb-D { background: var(--red-light);   color: var(--red-dark); }
+.grade-title    { font-size: 0.97rem; font-weight: 600; color: var(--slate-800); margin-bottom: 3px; }
+.grade-subtitle { font-size: 0.8rem; color: var(--slate-500); line-height: 1.5; }
+.grade-nudge    { font-size: 0.75rem; font-style: italic; color: var(--slate-400); margin-top: 5px; }
+
+/* ChargeSmart savings body */
+.results-body { padding: 1.1rem 1.6rem; }
+.result-line { display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0; border-bottom: 1px solid var(--slate-100); font-size: 0.86rem; }
+.result-line:last-child { border-bottom: none; }
+.result-line-label { color: var(--slate-500); }
+.result-line-value { font-weight: 500; font-family: var(--font-mono); color: var(--slate-800); }
+.result-line-value.green { color: var(--green); }
+.result-line-value.blue  { color: var(--blue); }
+
+/* Total block */
+.result-total { background: var(--navy); padding: 1.2rem 1.6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.result-total-label { font-size: 0.68rem; color: #64748B; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+.result-total-value { font-size: 2.4rem; font-weight: 600; color: #fff; font-family: var(--font-mono); letter-spacing: -0.03em; line-height: 1; }
+.result-annual-label { font-size: 0.68rem; color: #475569; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; text-align: right; }
+.result-annual-value { font-size: 1.15rem; font-weight: 600; color: #94A3B8; font-family: var(--font-mono); text-align: right; }
+.result-savings-line { font-size: 0.75rem; color: #475569; margin-top: 5px; transition: color 0.3s; }
+.result-savings-line.positive { color: #4ADE80; }
+.result-savings-line.negative { color: #F87171; }
+
+/* Inline CTA */
+.inline-cta { padding: 1.1rem 1.6rem; border-top: 1px solid var(--slate-100); display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; background: var(--surface-2); }
+.inline-cta-text { font-size: 0.82rem; color: var(--slate-600); flex: 1; min-width: 170px; line-height: 1.5; }
+.inline-cta-text strong { color: var(--slate-800); }
+.btn-inline-cta { display: inline-flex; align-items: center; gap: 6px; background: var(--green); color: #fff; font-family: var(--font); font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; border: none; border-radius: var(--radius-md); cursor: pointer; text-decoration: none; transition: background 0.15s; white-space: nowrap; flex-shrink: 0; }
+.btn-inline-cta:hover { background: #15803D; }
+
+/* ── Gas vs EV card ── */
+.gas-ev-card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--slate-200); overflow: hidden; box-shadow: var(--shadow-sm); }
+.gas-ev-header { padding: 1.25rem 1.6rem 1rem; border-bottom: 1px solid var(--slate-100); }
+.gas-ev-header .section-label { margin-bottom: 0.3rem; }
+.gas-ev-header h3 { font-size: 0.95rem; color: var(--slate-800); font-weight: 600; }
+.gas-ev-body { padding: 1rem 1.6rem; }
+.gas-ev-compare { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+.gas-ev-col { flex: 1; background: var(--page-bg); border-radius: var(--radius-md); padding: 0.9rem 1rem; text-align: center; border: 1px solid var(--slate-200); }
+.gas-ev-col.highlight { background: var(--green-light); border-color: #BBF7D0; }
+.gas-ev-col-label { font-size: 0.67rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--slate-400); margin-bottom: 5px; }
+.gas-ev-col.highlight .gas-ev-col-label { color: #15803D; }
+.gas-ev-col-value { font-size: 1.5rem; font-weight: 700; font-family: var(--font-mono); color: var(--slate-800); letter-spacing: -0.02em; line-height: 1; }
+.gas-ev-col.highlight .gas-ev-col-value { color: var(--green-dark); }
+.gas-ev-col-sub { font-size: 0.68rem; color: var(--slate-400); margin-top: 4px; }
+.gas-ev-total { background: var(--navy); border-radius: var(--radius-md); padding: 0.95rem 1.1rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+.gas-ev-total-label { font-size: 0.72rem; color: #64748B; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; }
+.gas-ev-total-value { font-size: 1.3rem; font-weight: 700; font-family: var(--font-mono); color: #4ADE80; }
+.gas-ev-sub-note { font-size: 0.74rem; color: var(--slate-500); line-height: 1.55; text-align: center; }
+
+/* ── Savings motivators section ── */
+#motivators { background: var(--surface); border-top: 1px solid var(--slate-200); padding: 4rem 0; }
+.motivators-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.1rem; }
+@media (max-width: 640px) { .motivators-grid { grid-template-columns: 1fr; } }
+.motivator-card { border-radius: var(--radius-lg); padding: 1.5rem; border: 1.5px solid var(--slate-200); background: var(--surface); box-shadow: var(--shadow-xs); }
+.motivator-icon { width: 40px; height: 40px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 0.9rem; }
+.motivator-card.c-green  { border-color: #BBF7D0; background: #F0FDF4; }
+.motivator-card.c-blue   { border-color: #BFDBFE; background: #EFF6FF; }
+.motivator-card.c-amber  { border-color: #FDE68A; background: #FFFBEB; }
+.motivator-card.c-green  .motivator-icon { background: var(--green-light); }
+.motivator-card.c-blue   .motivator-icon { background: var(--blue-light); }
+.motivator-card.c-amber  .motivator-icon { background: var(--amber-light); }
+.motivator-eyebrow { font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem; }
+.motivator-card.c-green  .motivator-eyebrow { color: var(--green); }
+.motivator-card.c-blue   .motivator-eyebrow { color: var(--blue); }
+.motivator-card.c-amber  .motivator-eyebrow { color: var(--amber); }
+.motivator-number { font-size: 2rem; font-weight: 700; font-family: var(--font-mono); letter-spacing: -0.02em; line-height: 1; margin-bottom: 0.35rem; }
+.motivator-card.c-green .motivator-number { color: var(--green-dark); }
+.motivator-card.c-blue  .motivator-number { color: var(--blue-dark); }
+.motivator-card.c-amber .motivator-number { color: var(--amber-dark); }
+.motivator-label { font-size: 0.82rem; font-weight: 600; color: var(--slate-700); margin-bottom: 0.3rem; }
+.motivator-desc  { font-size: 0.75rem; color: var(--slate-500); line-height: 1.55; }
+.motivator-equiv { font-size: 0.72rem; font-style: italic; color: var(--slate-400); margin-top: 0.5rem; }
+
+/* ── Behavior comparison ── */
+#sensitivity { background: var(--page-bg); padding: 4rem 0; }
+.section-header { margin-bottom: 2rem; }
+.section-header h2 { margin-bottom: 0.4rem; }
+.section-header p  { color: var(--slate-500); font-size: 0.93rem; max-width: 520px; }
+.scenario-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1.1rem; }
+@media (max-width: 640px) { .scenario-grid { grid-template-columns: 1fr; } }
+.scenario-card { border-radius: var(--radius-lg); padding: 1.3rem; border: 2px solid transparent; position: relative; transition: border-color 0.25s, box-shadow 0.25s; }
+.scenario-card.best   { background: #F0FDF4; border-color: #BBF7D0; }
+.scenario-card.middle { background: #FFFBEB; border-color: #FDE68A; }
+.scenario-card.worst  { background: #FEF2F2; border-color: #FECACA; }
+.scenario-card.active-scenario.best   { border-color: var(--green); box-shadow: var(--shadow-md); }
+.scenario-card.active-scenario.middle { border-color: var(--amber); box-shadow: var(--shadow-md); }
+.scenario-card.active-scenario.worst  { border-color: var(--red);   box-shadow: var(--shadow-md); }
+.scenario-grade-tag { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; font-family: var(--font-mono); }
+.scenario-card.best   .scenario-grade-tag { background: var(--green-light); color: var(--green-dark); }
+.scenario-card.middle .scenario-grade-tag { background: var(--amber-light); color: var(--amber-dark); }
+.scenario-card.worst  .scenario-grade-tag { background: var(--red-light);   color: var(--red-dark); }
+.scenario-badge-label { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; padding: 3px 9px; border-radius: 100px; margin-bottom: 0.8rem; display: inline-block; }
+.scenario-card.best   .scenario-badge-label { background: var(--green-light); color: var(--green-dark); }
+.scenario-card.middle .scenario-badge-label { background: var(--amber-light); color: var(--amber-dark); }
+.scenario-card.worst  .scenario-badge-label { background: var(--red-light);   color: var(--red-dark); }
+.scenario-title  { font-size: 0.86rem; font-weight: 600; color: var(--slate-800); margin-bottom: 2px; }
+.scenario-split  { font-size: 0.73rem; color: var(--slate-500); margin-bottom: 0.9rem; }
+.scenario-cost   { font-size: 1.7rem; font-weight: 700; font-family: var(--font-mono); letter-spacing: -0.02em; margin-bottom: 2px; line-height: 1; }
+.scenario-card.best   .scenario-cost { color: var(--green-dark); }
+.scenario-card.middle .scenario-cost { color: var(--amber-dark); }
+.scenario-card.worst  .scenario-cost { color: var(--red-dark); }
+.scenario-annual { font-size: 0.75rem; color: var(--slate-400); margin-bottom: 0.8rem; }
+.scenario-extra  { font-size: 0.75rem; font-style: italic; color: var(--slate-500); }
+.scenario-bar-wrap { height: 4px; background: rgba(0,0,0,0.06); border-radius: 100px; overflow: hidden; margin-top: 0.85rem; }
+.scenario-bar { height: 100%; border-radius: 100px; transition: width 0.4s ease; }
+.scenario-card.best   .scenario-bar { background: var(--green); }
+.scenario-card.middle .scenario-bar { background: var(--amber); }
+.scenario-card.worst  .scenario-bar { background: var(--red); }
+.current-you-tag { position: absolute; top: 10px; right: 48px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; background: var(--navy); color: #fff; padding: 3px 8px; border-radius: 100px; }
+.you-are-here { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--slate-500); padding: 0.85rem 1.2rem; background: var(--surface); border-radius: var(--radius-md); border: 1px solid var(--slate-200); }
+.you-are-here-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); flex-shrink: 0; }
+
+
+
+/* ── Explainer ── */
+#explainer { background: var(--surface); border-top: 1px solid var(--slate-200); padding: 4.5rem 0; }
+.explainer-header { text-align: center; max-width: 520px; margin: 0 auto 2.5rem; }
+.explainer-header h2 { margin-bottom: 0.6rem; }
+.explainer-header p  { color: var(--slate-500); font-size: 0.93rem; }
+.explainer-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+@media (max-width: 640px) { .explainer-grid { grid-template-columns: 1fr; } }
+.explainer-card { border-radius: var(--radius-lg); padding: 1.5rem; }
+.explainer-card.blue   { background: #EFF6FF; border: 1.5px solid #BFDBFE; }
+.explainer-card.green  { background: #F0FDF4; border: 1.5px solid #BBF7D0; }
+.explainer-card.orange { background: #FFF7ED; border: 1.5px solid #FED7AA; }
+.explainer-icon { width: 40px; height: 40px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; margin-bottom: 0.9rem; font-size: 18px; }
+.explainer-icon.blue   { background: var(--blue-light); }
+.explainer-icon.green  { background: var(--green-light); }
+.explainer-icon.orange { background: var(--orange-light); }
+.explainer-card h3 { margin-bottom: 0.4rem; font-size: 0.93rem; }
+.explainer-card.blue   h3 { color: var(--blue-dark); }
+.explainer-card.green  h3 { color: var(--green-dark); }
+.explainer-card.orange h3 { color: #9A3412; }
+.explainer-card p { font-size: 0.83rem; color: var(--slate-600); }
+.explainer-callout { background: var(--navy); border-radius: var(--radius-lg); padding: 1.3rem 1.75rem; display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap; }
+.explainer-callout p { color: #94A3B8; font-size: 0.88rem; flex: 1; min-width: 200px; }
+.explainer-callout strong { color: #fff; }
+
+/* ── Tips ── */
+#tips { background: var(--page-bg); padding: 4.5rem 0; }
+.tips-header { text-align: center; max-width: 480px; margin: 0 auto 2.5rem; }
+.tips-header h2 { margin-bottom: 0.5rem; }
+.tips-header p  { color: var(--slate-500); font-size: 0.93rem; }
+.tips-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; }
+@media (max-width: 640px) { .tips-grid { grid-template-columns: 1fr; } }
+.tip-card { background: var(--surface); border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow-sm); border: 1px solid var(--slate-200); }
+.tip-number { width: 32px; height: 32px; border-radius: 50%; background: var(--navy); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.78rem; margin-bottom: 0.85rem; font-family: var(--font-mono); }
+.tip-card h3 { margin-bottom: 0.4rem; font-size: 0.93rem; }
+.tip-card p  { font-size: 0.82rem; color: var(--slate-600); line-height: 1.65; }
+.tip-time-badge { display: inline-block; background: var(--blue-light); color: var(--blue-dark); font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 100px; margin-top: 0.65rem; }
+
+/* ── CTA ── */
+#cta { background: var(--navy); padding: 5.5rem 0; }
+.cta-inner { text-align: center; max-width: 520px; margin: 0 auto; padding: 0 1.5rem; }
+#cta h2   { color: #fff; margin-bottom: 0.85rem; }
+#cta p    { color: #64748B; margin-bottom: 2rem; font-size: 0.95rem; }
+.cta-btn-group { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
+.btn-cta-primary { display: inline-flex; align-items: center; gap: 7px; background: var(--green); color: #fff; font-family: var(--font); font-size: 0.97rem; font-weight: 600; padding: 0.9rem 2rem; border: none; border-radius: var(--radius-md); cursor: pointer; text-decoration: none; transition: background 0.15s; }
+.btn-cta-primary:hover { background: #15803D; }
+.btn-cta-ghost { display: inline-flex; color: #64748B; font-family: var(--font); font-size: 0.9rem; padding: 0.9rem 1.5rem; border: 1px solid rgba(255,255,255,0.12); border-radius: var(--radius-md); text-decoration: none; background: transparent; transition: color 0.15s, border-color 0.15s; }
+.btn-cta-ghost:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+.cta-disclaimer { font-size: 0.71rem; color: #334155; line-height: 1.65; max-width: 420px; margin: 0 auto; }
+
+/* scroll offsets */
+#calculator, #motivators, #sensitivity, #explainer, #tips, #cta { scroll-margin-top: 56px; }
+
+/* ============================================
+   SCREEN 2 — COACHING MESSAGES
+   ============================================ */
+#screen-messages { background: var(--page-bg); padding-top: 56px; min-height: 100vh; position: relative; z-index: 1; }
+.msg-screen-wrap { max-width: 680px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+
+.msg-screen-header { margin-bottom: 2.5rem; }
+.msg-screen-header h2 { margin-bottom: 0.4rem; color: var(--navy); }
+.msg-screen-header p  { color: var(--slate-500); font-size: 0.93rem; max-width: 500px; }
+
+/* Phone frame */
+.phone-thread {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--slate-200);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 1.5rem;
+}
+.thread-header {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--slate-200);
+  padding: 0.85rem 1.25rem;
+  display: flex; align-items: center; gap: 0.75rem;
+}
+.thread-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--navy-light);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; flex-shrink: 0;
+}
+.thread-from   { font-size: 0.86rem; font-weight: 600; color: var(--slate-800); }
+.thread-handle { font-size: 0.72rem; color: var(--slate-400); margin-top: 1px; }
+.thread-tag { margin-left: auto; }
+
+.thread-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.65rem; }
+
+.bubble-row { display: flex; align-items: flex-end; gap: 0.5rem; }
+.bubble-row.inbound  { justify-content: flex-start; }
+.bubble-row.outbound { justify-content: flex-end; }
+
+.bubble-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--navy-light); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; flex-shrink: 0; margin-bottom: 2px; }
+
+.bubble {
+  max-width: 78%;
+  padding: 0.7rem 0.95rem;
+  border-radius: 18px;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+.bubble.from-program {
+  background: var(--slate-100);
+  color: var(--slate-800);
+  border-bottom-left-radius: 4px;
+}
+.bubble.from-program.positive { background: #F0FDF4; border: 1px solid #BBF7D0; color: var(--green-dark); }
+.bubble.from-program.warning  { background: #FFFBEB; border: 1px solid #FDE68A; color: var(--amber-dark); }
+.bubble.from-program.info     { background: var(--blue-light); border: 1px solid #BFDBFE; color: var(--blue-dark); }
+.bubble.from-user {
+  background: var(--blue);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+  align-self: flex-end;
+}
+.bubble-time-stamp { font-size: 0.63rem; color: var(--slate-400); text-align: center; padding: 0.25rem 0; }
+
+/* Thread type label */
+.thread-type-label {
+  font-size: 0.67rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.09em; padding: 0.65rem 1.25rem;
+  border-top: 1px solid var(--slate-100);
+  color: var(--slate-400); background: var(--surface-2);
+  display: flex; align-items: center; gap: 6px;
+}
+
+
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- Nav -->
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo" onclick="showScreen('calculator');return false;">
+      ⚡ ChargeSmart <span class="nav-logo-badge">AMEREN</span>
+    </a>
+    <div class="nav-links">
+      <button class="nav-tab active-tab" onclick="showScreen('calculator')" id="tab-calc">Calculator</button>
+      <button class="nav-tab" onclick="showScreen('messages')" id="tab-msg">Coaching Messages</button>
+    </div>
+    <a href="#" class="nav-cta" onclick="showScreen('calculator');setTimeout(()=>document.getElementById('cta').scrollIntoView({behavior:'smooth'}),50);return false;">Enroll now</a>
+  </div>
+</nav>
+
+<!-- Single render target -->
+<div id="main-content"></div>
+
+<script>
+var CALC_HTML = "<div id=\"orient\">\n    <div class=\"orient-inner\">\n      <h1>See how much you could<br><strong>save with ChargeSmart</strong></h1>\n      <p class=\"orient-sub\">Your EV already saves you money vs. gas. <strong>ChargeSmart saves you even more</strong> \u2014 by rewarding overnight charging. See your numbers below.</p>\n    </div>\n  </div>\n\n  <section id=\"calculator\">\n    <div class=\"container\">\n      <div class=\"calc-layout\">\n\n        <!-- Inputs -->\n        <div class=\"card\">\n          <div class=\"section-label\" style=\"margin-bottom:1.2rem;\">Your details</div>\n\n          <div class=\"input-group\">\n            <div class=\"input-label\">\n              <span class=\"input-label-text\">Monthly miles driven</span>\n              <span class=\"input-label-value\" id=\"milesDisplay\">1,000 mi</span>\n            </div>\n            <input type=\"range\" id=\"milesSlider\" min=\"500\" max=\"2000\" step=\"50\" value=\"1000\">\n            <div class=\"range-labels\"><span>500 mi</span><span>2,000 mi</span></div>\n          </div>\n\n          <div class=\"input-group\">\n            <div class=\"input-label\" style=\"margin-bottom:0.8rem;\">\n              <span class=\"input-label-text\">When do you usually charge?</span>\n            </div>\n            <div class=\"behavior-selector\">\n              <div class=\"behavior-option sel-blue\" data-behavior=\"optimized\">\n                <div class=\"behavior-dot\"></div>\n                <div class=\"behavior-text\">\n                  <div class=\"behavior-title\">Mostly overnight</div>\n                  <div class=\"behavior-subtitle\">Charging between 11pm \u2013 7am</div>\n                </div>\n                <span class=\"badge badge-blue\">Best</span>\n              </div>\n              <div class=\"behavior-option\" data-behavior=\"mixed\">\n                <div class=\"behavior-dot\"></div>\n                <div class=\"behavior-text\">\n                  <div class=\"behavior-title\">Mix of day and night</div>\n                  <div class=\"behavior-subtitle\">Roughly split between windows</div>\n                </div>\n                <span class=\"badge badge-amber\">Mixed</span>\n              </div>\n              <div class=\"behavior-option\" data-behavior=\"poor\">\n                <div class=\"behavior-dot\"></div>\n                <div class=\"behavior-text\">\n                  <div class=\"behavior-title\">Mostly daytime</div>\n                  <div class=\"behavior-subtitle\">Charging between 11am \u2013 7pm</div>\n                </div>\n                <span class=\"badge\" style=\"background:#FEE2E2;color:#991B1B;\">High risk</span>\n              </div>\n            </div>\n          </div>\n\n          <div class=\"divider\"></div>\n          <button class=\"advanced-toggle\" id=\"advancedToggle\" onclick=\"toggleAdvanced()\">\n            <svg width=\"13\" height=\"13\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M3.5 5.25L7 8.75L10.5 5.25\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>\n            Adjust assumptions\n          </button>\n          <div class=\"advanced-panel\" id=\"advancedPanel\">\n            <div class=\"advanced-row\" style=\"margin-top:0.75rem;\">\n              <div class=\"adv-field\">\n                <label>Gas price ($/gallon)</label>\n                <input type=\"number\" id=\"gasPrice\" value=\"3.40\" min=\"2.00\" max=\"6.00\" step=\"0.05\">\n              </div>\n              <div class=\"adv-field\">\n                <label>Gas car MPG</label>\n                <input type=\"number\" id=\"mpg\" value=\"28\" min=\"15\" max=\"50\" step=\"1\">\n              </div>\n            </div>\n            <div class=\"advanced-row\" style=\"margin-top:0.75rem;\">\n              <div class=\"adv-field\">\n                <label>EV efficiency (mi/kWh)</label>\n                <input type=\"number\" id=\"efficiency\" value=\"3.2\" min=\"2.0\" max=\"5.0\" step=\"0.1\">\n              </div>\n              <div class=\"adv-field\">\n                <label>Standard rate ($/kWh)</label>\n                <input type=\"number\" id=\"baseRate\" value=\"0.13\" min=\"0.08\" max=\"0.30\" step=\"0.01\">\n              </div>\n            </div>\n            <p style=\"font-size:0.71rem;color:var(--slate-400);margin-top:0.6rem;line-height:1.55;\">These defaults reflect Southern Illinois typical values. Adjust to match your situation.</p>\n          </div>\n        </div>\n\n        <!-- ChargeSmart results -->\n        <div style=\"display:flex;flex-direction:column;gap:1rem;\">\n\n          <!-- Gas vs EV card -->\n          <div class=\"gas-ev-card\">\n            <div class=\"gas-ev-header\">\n              <div class=\"section-label\">Your EV advantage</div>\n              <h3>Gas vs. electric at your mileage</h3>\n            </div>\n            <div class=\"gas-ev-body\">\n              <div class=\"gas-ev-compare\">\n                <div class=\"gas-ev-col\">\n                  <div class=\"gas-ev-col-label\">\u26fd Gas car</div>\n                  <div class=\"gas-ev-col-value\" id=\"gasCost\">$\u2014</div>\n                  <div class=\"gas-ev-col-sub\">est. monthly fuel</div>\n                </div>\n                <div class=\"gas-ev-col\">\n                  <div class=\"gas-ev-col-label\">\u26a1 EV standard rate</div>\n                  <div class=\"gas-ev-col-value\" id=\"evStdCost\">$\u2014</div>\n                  <div class=\"gas-ev-col-sub\">without ChargeSmart</div>\n                </div>\n                <div class=\"gas-ev-col highlight\">\n                  <div class=\"gas-ev-col-label\">\u26a1 EV + ChargeSmart</div>\n                  <div class=\"gas-ev-col-value\" id=\"evCsCost\">$\u2014</div>\n                  <div class=\"gas-ev-col-sub\">with overnight charging</div>\n                </div>\n              </div>\n              <div class=\"gas-ev-total\">\n                <div>\n                  <div class=\"gas-ev-total-label\">Total monthly savings vs. gas</div>\n                </div>\n                <div class=\"gas-ev-total-value\" id=\"totalVsGas\">$\u2014</div>\n              </div>\n              <p class=\"gas-ev-sub-note\" id=\"gasEvNote\">You're already saving by driving electric. ChargeSmart adds even more on top.</p>\n            </div>\n          </div>\n\n        \n\n          <!-- ChargeSmart savings -->\n\n          <div class=\"results-card\">\n            <!-- Grade banner -->\n            <div class=\"grade-banner gbg-A\" id=\"gradeBanner\">\n              <div class=\"grade-badge gb-A\" id=\"gradeBadge\">A</div>\n              <div>\n                <div class=\"grade-title\" id=\"gradeTitle\">Smart charger</div>\n                <div class=\"grade-subtitle\" id=\"gradeSubtitle\">You're maximizing your savings. Keep charging overnight.</div>\n                <div class=\"grade-nudge\" id=\"gradeNudge\">Top ChargeSmart members consistently charge overnight.</div>\n              </div>\n            </div>\n\n            <!-- ChargeSmart breakdown -->\n            <div class=\"results-body\">\n              <div class=\"section-label\" style=\"margin-bottom:0.8rem;\">ChargeSmart monthly savings</div>\n              <div class=\"result-line\">\n                <span class=\"result-line-label\">\ud83c\udf19 Overnight charging credit</span>\n                <span class=\"result-line-value green\" id=\"offpeakCredit\">\u2014</span>\n              </div>\n              <div class=\"result-line\">\n                <span class=\"result-line-label\">\ud83d\udcb3 Enrollment credit (first 12 months)</span>\n                <span class=\"result-line-value green\">+ $4.00</span>\n              </div>\n              <div class=\"result-line\" style=\"border-top:1px solid var(--slate-200);margin-top:0.15rem;padding-top:0.6rem;\">\n                <span class=\"result-line-label\" style=\"color:var(--slate-500);font-style:italic;\">Without ChargeSmart (standard rate)</span>\n                <span class=\"result-line-value\" id=\"stdCost\">\u2014</span>\n              </div>\n            </div>\n\n            <!-- Total -->\n            <div class=\"result-total\">\n              <div>\n                <div class=\"result-total-label\">Estimated monthly savings</div>\n                <div class=\"result-total-value\" id=\"totalMonthly\">$\u2014</div>\n                <div class=\"result-savings-line positive\" id=\"savingsLine\">vs. standard rate charging</div>\n              </div>\n              <div style=\"text-align:right;\">\n                <div class=\"result-annual-label\">Annual</div>\n                <div class=\"result-annual-value\" id=\"totalAnnual\">$\u2014</div>\n              </div>\n            </div>\n\n            <!-- Inline CTA -->\n            <div class=\"inline-cta\">\n              <div class=\"inline-cta-text\" id=\"inlineCTAText\"><strong>Ready to lock in your savings?</strong> Enrolling takes just a few minutes.</div>\n              <a href=\"#\" class=\"btn-inline-cta\">Enroll in ChargeSmart <svg width=\"13\" height=\"13\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M2.5 7h9M8 3.5L11.5 7 8 10.5\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></a>\n            </div>\n          </div></div>\n      </div>\n      </div>\n    </div>\n  </section>\n\n  <!-- Savings motivators -->\n  <section id=\"motivators\">\n    <div class=\"container\">\n      <div class=\"section-header\">\n        <div class=\"section-label\">Why it adds up</div>\n        <h2>Small monthly savings, big picture</h2>\n        <p>Monthly savings can feel abstract. Here's what overnight charging actually means over time.</p>\n      </div>\n      <div class=\"motivators-grid\">\n\n        <div class=\"motivator-card c-green\">\n          <div class=\"motivator-icon\">\ud83d\udcc5</div>\n          <div class=\"motivator-eyebrow\">Annual savings</div>\n          <div class=\"motivator-number\" id=\"motivAnnual\">$\u2014</div>\n          <div class=\"motivator-label\">Saved per year with Grade A charging</div>\n          <div class=\"motivator-desc\">Based on your current mileage and mostly overnight charging. Consistent Grade A behavior compounds this every month.</div>\n          <div class=\"motivator-equiv\" id=\"motivEquiv\">That's roughly \u2014 free months of charging per year.</div>\n        </div>\n\n        <div class=\"motivator-card c-blue\">\n          <div class=\"motivator-icon\">\ud83d\uddd3\ufe0f</div>\n          <div class=\"motivator-eyebrow\">5-year projection</div>\n          <div class=\"motivator-number\" id=\"motiv5yr\">$\u2014</div>\n          <div class=\"motivator-label\">Cumulative savings over 5 years</div>\n          <div class=\"motivator-desc\">Overnight charging vs. daytime charging compounded over a typical EV ownership period. The difference grows every year.</div>\n          <div class=\"motivator-equiv\" id=\"motiv5yrEquiv\">vs. mostly daytime charging over the same period.</div>\n        </div>\n\n        <div class=\"motivator-card c-amber\">\n          <div class=\"motivator-icon\">\u26fd</div>\n          <div class=\"motivator-eyebrow\">vs. gas over 5 years</div>\n          <div class=\"motivator-number\" id=\"motiv5yrGas\">$\u2014</div>\n          <div class=\"motivator-label\">Total fuel savings vs. driving gas</div>\n          <div class=\"motivator-desc\">Your EV + ChargeSmart vs. the equivalent gas vehicle at your current mileage. This is your full energy cost advantage.</div>\n          <div class=\"motivator-equiv\" id=\"motivGasEquiv\">Based on current gas prices and your mileage.</div>\n        </div>\n\n      </div>\n    </div>\n  </section>\n\n  <!-- Behavior comparison -->\n  <section id=\"sensitivity\">\n    <div class=\"container\">\n      <div class=\"section-header\">\n        <div class=\"section-label\">Behavior comparison</div>\n        <h2>See what changes when you shift your charging time</h2>\n        <p>Same mileage, same EV \u2014 the only difference is when you plug in.</p>\n      </div>\n      <div class=\"scenario-grid\">\n        <div class=\"scenario-card best\" id=\"scenBest\">\n          <div class=\"scenario-grade-tag\">A</div>\n          <span class=\"scenario-badge-label\">Overnight</span>\n          <div class=\"scenario-title\">Mostly overnight</div>\n          <div class=\"scenario-split\">Charging after 11pm most nights</div>\n          <div class=\"scenario-cost\" id=\"scenBestCost\">$\u2014</div>\n          <div class=\"scenario-annual\" id=\"scenBestAnnual\">$\u2014 /year saved</div>\n          <div class=\"scenario-extra\" id=\"scenBestExtra\"></div>\n          <div class=\"scenario-bar-wrap\"><div class=\"scenario-bar\" id=\"scenBestBar\"></div></div>\n        </div>\n        <div class=\"scenario-card middle\" id=\"scenMid\">\n          <div class=\"scenario-grade-tag\">C</div>\n          <span class=\"scenario-badge-label\">Mixed</span>\n          <div class=\"scenario-title\">Day and night mix</div>\n          <div class=\"scenario-split\">Some overnight, some daytime</div>\n          <div class=\"scenario-cost\" id=\"scenMidCost\">$\u2014</div>\n          <div class=\"scenario-annual\" id=\"scenMidAnnual\">$\u2014 /year saved</div>\n          <div class=\"scenario-extra\" id=\"scenMidExtra\"></div>\n          <div class=\"scenario-bar-wrap\"><div class=\"scenario-bar\" id=\"scenMidBar\"></div></div>\n        </div>\n        <div class=\"scenario-card worst\" id=\"scenWorst\">\n          <div class=\"scenario-grade-tag\">D</div>\n          <span class=\"scenario-badge-label\">Daytime</span>\n          <div class=\"scenario-title\">Mostly daytime</div>\n          <div class=\"scenario-split\">Charging during peak hours</div>\n          <div class=\"scenario-cost\" id=\"scenWorstCost\">$\u2014</div>\n          <div class=\"scenario-annual\" id=\"scenWorstAnnual\">$\u2014 /year saved</div>\n          <div class=\"scenario-extra\" id=\"scenWorstExtra\"></div>\n          <div class=\"scenario-bar-wrap\"><div class=\"scenario-bar\" id=\"scenWorstBar\"></div></div>\n        </div>\n      </div>\n      <div class=\"you-are-here\">\n        <div class=\"you-are-here-dot\"></div>\n        <span id=\"youAreHereText\">Your current selection updating\u2026</span>\n      </div>\n    </div>\n  </section>\n\n  <!-- How it works -->\n  <section id=\"explainer\">\n    <div class=\"container\">\n      <div class=\"explainer-header\">\n        <div class=\"section-label\">How ChargeSmart works</div>\n        <h2>Night charging pays. Day charging costs more.</h2>\n        <p>ChargeSmart rewards you for charging during off-peak hours with a per-kWh credit, plus a monthly enrollment credit just for being in the program.</p>\n      </div>\n      <div class=\"explainer-grid\">\n        <div class=\"explainer-card blue\">\n          <div class=\"explainer-icon blue\">\ud83c\udf19</div>\n          <h3>Earn overnight credits</h3>\n          <p>Charging between <strong>11pm and 7am</strong> earns a small credit on your bill \u2014 roughly <strong>$0.01\u2013$0.02 per kWh</strong> of usage during that window. Small per charge, meaningful over a month.</p>\n          <div style=\"margin-top:0.85rem;\"><span class=\"badge badge-blue\">Preferred window: 11pm \u2013 7am</span></div>\n        </div>\n        <div class=\"explainer-card green\">\n          <div class=\"explainer-icon green\">\ud83d\udcb3</div>\n          <h3>Enrollment credit</h3>\n          <p>You receive a <strong>$4 monthly credit</strong> for your first 12 months enrolled \u2014 regardless of when you charge. It's guaranteed money back just for participating.</p>\n          <div style=\"margin-top:0.85rem;\"><span class=\"badge badge-green\">$4/month \u00b7 first 12 months</span></div>\n        </div>\n        <div class=\"explainer-card orange\">\n          <div class=\"explainer-icon orange\">\u2600\ufe0f</div>\n          <h3>Daytime charging costs more</h3>\n          <p>Charging between <strong>11am and 7pm</strong> increases your exposure to peak demand charges \u2014 which can reduce or offset the credits you've earned overnight.</p>\n          <div style=\"margin-top:0.85rem;\"><span class=\"badge badge-amber\">Avoid 11am \u2013 7pm when possible</span></div>\n        </div>\n      </div>\n      <div class=\"explainer-callout\">\n        <div style=\"font-size:1.4rem;flex-shrink:0;\">\ud83d\udca1</div>\n        <p><strong>The bottom line:</strong> Overnight charging earns you credits. Daytime charging can erode them. The more consistent your overnight charging, the more you save \u2014 and the higher your grade.</p>\n      </div>\n    </div>\n  </section>\n\n  <!-- Tips -->\n  <section id=\"tips\">\n    <div class=\"container\">\n      <div class=\"tips-header\">\n        <div class=\"section-label\">How to succeed</div>\n        <h2>Three habits that protect your grade</h2>\n        <p>One behavioral shift is all it takes to move from a D to an A.</p>\n      </div>\n      <div class=\"tips-grid\">\n        <div class=\"tip-card\">\n          <div class=\"tip-number\">01</div>\n          <h3>Plug in after 11pm</h3>\n          <p>The preferred window runs 11pm to 7am. This earns an off-peak credit and keeps your EV load completely outside the peak demand measurement window.</p>\n          <div class=\"tip-time-badge\">11:00 pm \u2013 7:00 am</div>\n        </div>\n        <div class=\"tip-card\">\n          <div class=\"tip-number\">02</div>\n          <h3>Avoid stacking appliances at peak hours</h3>\n          <p>Your peak demand is based on total household load. Running the EV, dryer, and AC simultaneously between 11am\u20137pm creates your worst-case reading \u2014 avoid that combination.</p>\n          <div style=\"margin-top:0.65rem;\"><span class=\"badge badge-amber\">Stacking = higher peak reading</span></div>\n        </div>\n        <div class=\"tip-card\">\n          <div class=\"tip-number\">03</div>\n          <h3>Use your car's charge scheduler</h3>\n          <p>Most EVs let you schedule a charge start time in the vehicle app. Set it for 11:05pm \u2014 the car handles it every night automatically, no willpower required.</p>\n          <div style=\"margin-top:0.65rem;\"><span class=\"badge badge-blue\">Automate it \u2014 set once, benefit monthly</span></div>\n        </div>\n      </div>\n    </div>\n  </section>\n\n  <!-- CTA -->\n  <section id=\"cta\" style=\"background:var(--navy);padding:5.5rem 0;\">\n    <div class=\"cta-inner\">\n      <div class=\"section-label\" style=\"color:#334155;\">Ready to save?</div>\n      <h2 style=\"color:#fff;margin-bottom:0.85rem;\">Start saving on every charge</h2>\n      <p style=\"color:#64748B;margin-bottom:2rem;\">Join ChargeSmart and take control of your EV charging costs. Enrollment takes minutes \u2014 savings start on your next billing cycle.</p>\n      <div class=\"cta-btn-group\">\n        <a href=\"#\" class=\"btn-cta-primary\">Enroll in ChargeSmart \u2192</a>\n        <a href=\"#\" class=\"btn-cta-ghost\">Learn more</a>\n      </div>\n      <p class=\"cta-disclaimer\">This tool provides estimated costs based on typical usage and simplified assumptions. Actual savings may vary based on individual usage patterns, specific electricity rates, and program details. ChargeSmart is available to eligible Ameren Illinois customers.</p>\n    </div>\n  </section>";
+var MSG_HTML  = "<div class=\"msg-screen-wrap\">\n\n    <div class=\"msg-screen-header\">\n      <div class=\"section-label\">ChargeSmart concierge program</div>\n      <h2>Coaching messages</h2>\n      <p>Illustrative examples of the automated text coaching experience \u2014 reinforcing the savings and behaviors that matter most to enrolled members. Each message maps to a key motivational moment.</p>\n    </div>\n\n    <!-- 1. Month-end Grade A \u2014 streak + savings confirmation -->\n    <div class=\"phone-thread\">\n      <div class=\"thread-header\">\n        <div class=\"thread-avatar\">\u26a1</div>\n        <div>\n          <div class=\"thread-from\">ChargeSmart</div>\n          <div class=\"thread-handle\">Ameren Illinois \u00b7 April 30, 11:58 pm</div>\n        </div>\n        <div class=\"thread-tag\"><span class=\"badge badge-green\">Grade A \u00b7 Month-end</span></div>\n      </div>\n      <div class=\"thread-body\">\n        <div class=\"bubble-time-stamp\">April 30, 2026</div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program positive\">\n            April is in the books, Sarah! \ud83c\udf19 You charged overnight <strong>27 out of 30 nights</strong> \u2014 that's a <strong>Grade A</strong>. Your ChargeSmart savings this month: <strong>$14.20</strong>.<br><br>That's on top of what you're already saving by driving electric instead of gas.\n          </div>\n        </div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program\" style=\"background:var(--slate-50);\">\n            Your <strong>$4 enrollment credit</strong> has been applied. 12-month streak: <strong>4 months</strong> at Grade A. You've saved <strong>$52.80</strong> since joining. \ud83c\udf89\n          </div>\n        </div>\n        <div class=\"bubble-row outbound\">\n          <div class=\"bubble from-user\">That's awesome! Love that it runs automatically.</div>\n        </div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program positive\">Exactly the idea. Set the timer once, save every month. See you in May! \ud83c\udf19</div>\n        </div>\n      </div>\n      <div class=\"thread-type-label\">\ud83d\udcca Motivator: Monthly savings confirmation + streak gamification</div>\n    </div>\n\n    <!-- 2. Mid-month slipping -->\n    <div class=\"phone-thread\">\n      <div class=\"thread-header\">\n        <div class=\"thread-avatar\">\u26a1</div>\n        <div>\n          <div class=\"thread-from\">ChargeSmart</div>\n          <div class=\"thread-handle\">Ameren Illinois \u00b7 April 16, 2:30 pm</div>\n        </div>\n        <div class=\"thread-tag\"><span class=\"badge badge-amber\">Grade slipping \u00b7 Mid-month</span></div>\n      </div>\n      <div class=\"thread-body\">\n        <div class=\"bubble-time-stamp\">Wednesday, April 16</div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program warning\">\n            Hey Sarah \u2014 we noticed <strong>3 daytime charges</strong> this week. Your grade slipped to a <strong>C</strong> and your projected monthly savings dropped by about <strong>$5.80</strong>.\n          </div>\n        </div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program\" style=\"background:var(--slate-50);\">\n            You've still got <strong>14 days left in April</strong>. Plug in tonight after 11pm and you'll start recovering right away. A Grade A is still within reach. \ud83d\udcaa\n          </div>\n        </div>\n        <div class=\"bubble-row outbound\">\n          <div class=\"bubble from-user\">Thanks for the heads up. Setting my timer now.</div>\n        </div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program positive\">That's all it takes. You've got this. \ud83c\udf19</div>\n        </div>\n      </div>\n      <div class=\"thread-type-label\">\u26a0\ufe0f Motivator: Behavior nudge \u2014 savings at risk, clear recovery action</div>\n    </div>\n\n    <!-- 3. Annual milestone -->\n    <div class=\"phone-thread\">\n      <div class=\"thread-header\">\n        <div class=\"thread-avatar\">\u26a1</div>\n        <div>\n          <div class=\"thread-from\">ChargeSmart</div>\n          <div class=\"thread-handle\">Ameren Illinois \u00b7 January 1 \u00b7 Your 12-month mark</div>\n        </div>\n        <div class=\"thread-tag\"><span class=\"badge badge-blue\">Annual milestone</span></div>\n      </div>\n      <div class=\"thread-body\">\n        <div class=\"bubble-time-stamp\">January 1, 2026 \u00b7 Your ChargeSmart anniversary</div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program info\">\n            Happy New Year, Sarah! \ud83c\udf86 You've been a ChargeSmart member for <strong>12 months</strong>. Here's your year in review:<br><br>\n            \ud83c\udf19 <strong>$156.40</strong> saved with ChargeSmart<br>\n            \u26fd <strong>$1,247</strong> saved vs. driving gas<br>\n            \u2705 <strong>9 months</strong> at Grade A or better<br>\n            \u26a1 <strong>3,847 kWh</strong> charged overnight\n          </div>\n        </div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program\" style=\"background:var(--slate-50);\">\n            Combined, your EV + overnight charging saved you <strong>$1,403</strong> compared to driving gas and charging whenever. That's a good year.\n          </div>\n        </div>\n        <div class=\"bubble-row outbound\">\n          <div class=\"bubble from-user\">Wow I didn't realize the gas savings were that big!</div>\n        </div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program positive\">The EV does most of the work \u2014 ChargeSmart just squeezes out the extra. Here's to year two! \ud83c\udf19</div>\n        </div>\n      </div>\n      <div class=\"thread-type-label\">\ud83d\udcc5 Motivator: Annual savings total + gas vs. EV framing</div>\n    </div>\n\n    <!-- 4. Welcome / day 1 -->\n    <div class=\"phone-thread\">\n      <div class=\"thread-header\">\n        <div class=\"thread-avatar\">\u26a1</div>\n        <div>\n          <div class=\"thread-from\">ChargeSmart</div>\n          <div class=\"thread-handle\">Ameren Illinois \u00b7 Welcome message</div>\n        </div>\n        <div class=\"thread-tag\"><span class=\"badge badge-navy\">New enrollee \u00b7 Day 1</span></div>\n      </div>\n      <div class=\"thread-body\">\n        <div class=\"bubble-time-stamp\">Day 1 of your ChargeSmart membership</div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program info\">\n            Welcome to ChargeSmart, Sarah! \ud83c\udf89 You're now enrolled. Here's what to expect:<br><br>\n            \ud83c\udf19 Charge after <strong>11pm</strong> to earn overnight credits<br>\n            \ud83d\udcb3 Your <strong>$4 monthly credit</strong> is automatic<br>\n            \ud83d\udcca We'll text you your grade at the end of each month\n          </div>\n        </div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program\" style=\"background:var(--slate-50);\">\n            At 1,000 miles/month with overnight charging, you could save around <strong>$13\u2013$15/month</strong> on top of what you already save vs. gas. <strong>Grade A</strong> is the goal \u2014 and it's just one habit: plug in at bedtime.\n          </div>\n        </div>\n        <div class=\"bubble-row outbound\">\n          <div class=\"bubble from-user\">Got it! Does my car's charge timer work for this?</div>\n        </div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program positive\">Yes \u2014 set it to start at 11:05pm in your vehicle app and you'll never have to think about it again. That's the Grade A setup. \ud83c\udf19</div>\n        </div>\n      </div>\n      <div class=\"thread-type-label\">\ud83d\udc4b Motivator: Onboarding \u2014 expectation setting + immediate action</div>\n    </div>\n\n    <!-- 5. Seasonal tip -->\n    <div class=\"phone-thread\">\n      <div class=\"thread-header\">\n        <div class=\"thread-avatar\">\u26a1</div>\n        <div>\n          <div class=\"thread-from\">ChargeSmart</div>\n          <div class=\"thread-handle\">Ameren Illinois \u00b7 July contextual tip</div>\n        </div>\n        <div class=\"thread-tag\"><span class=\"badge badge-amber\">Seasonal \u00b7 Summer peak</span></div>\n      </div>\n      <div class=\"thread-body\">\n        <div class=\"bubble-time-stamp\">July 8 \u00b7 Summer peak season</div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program warning\">\n            \u2600\ufe0f Summer peak alert, Sarah. July and August are the highest-demand months in Southern Illinois \u2014 grid usage peaks between <strong>2pm and 6pm</strong> on hot days.\n          </div>\n        </div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program\" style=\"background:var(--slate-50);\">\n            Overnight charging matters <strong>even more right now</strong>. Members who maintain overnight charging in summer save an average of <strong>$3\u2013$5 more</strong> per month than those who slip during the heat. Your timer is your best tool. \ud83c\udf19\n          </div>\n        </div>\n        <div class=\"bubble-row outbound\">\n          <div class=\"bubble from-user\">Good to know. My AC is running a lot \u2014 I'll keep the charging overnight for sure.</div>\n        </div>\n        <div class=\"bubble-row inbound\">\n          <div class=\"bubble-avatar\">\u26a1</div>\n          <div class=\"bubble from-program positive\">Smart move. Your AC + EV at the same time in peak hours is the scenario to avoid. Overnight charging sidesteps that entirely. Keep it up! \ud83c\udf19</div>\n        </div>\n      </div>\n      <div class=\"thread-type-label\">\ud83c\udf21\ufe0f Motivator: Seasonal context \u2014 summer peak + incremental savings reinforcement</div>\n    </div>\n\n  </div>";
+
+/* =============================================
+   EDITABLE ASSUMPTIONS
+   ============================================= */
+const A = {
+  /* ChargeSmart program */
+  offPeakCreditRate: 0.015,   // $/kWh credit for overnight charging
+  enrollmentCredit:  4.00,    // $/month flat, first 12 months
+  /* Savings tiers vs standard rate ($/month) — behavioral approximation */
+  savingsTiers: {
+    optimized: { pct: 0.85 },       // 85% overnight
+    mixed:     { pct: 0.50 },       // 50% overnight
+    poor:      { pct: 0.25 }        // 25% overnight
+  },
+  /* EV defaults */
+  efficiency: 3.2,    // mi/kWh
+  miles:      1000,   // monthly miles
+  baseRate:   0.13,   // $/kWh standard rate
+  /* Gas defaults */
+  gasPrice:   3.40,   // $/gallon
+  mpg:        28,     // miles per gallon
+};
+
+const GRADES = {
+  optimized: {
+    letter: 'A', bgClass: 'gbg-A', badgeClass: 'gb-A',
+    title:    'Smart charger',
+    subtitle: "You're maximizing your ChargeSmart savings. Keep charging overnight.",
+    nudge:    'Top ChargeSmart members consistently charge overnight.'
+  },
+  mixed: {
+    letter: 'C', bgClass: 'gbg-C', badgeClass: 'gb-C',
+    title:    'Getting there',
+    subtitle: "You're capturing some savings. Shifting more charges to overnight could save you an extra $X this month.",
+    nudge:    'Most members who set a charge timer move up to Grade A within a month.'
+  },
+  poor: {
+    letter: 'D', bgClass: 'gbg-D', badgeClass: 'gb-D',
+    title:    'Room to grow',
+    subtitle: "Charging overnight instead of daytime could save you $X more every month.",
+    nudge:    'One timer setting is the difference between a D and an A.'
+  }
+};
+
+const CTA_COPY = {
+  optimized: '<strong>You\'re on track.</strong> Lock in your Grade A savings by enrolling today.',
+  mixed:     '<strong>You could do better.</strong> Enroll and set a charge timer to move up to Grade A.',
+  poor:      '<strong>Big savings available.</strong> Enroll and schedule overnight charging to unlock them.'
+};
+
+let state = {
+  miles:      A.miles,
+  behavior:   'optimized',
+  efficiency: A.efficiency,
+  baseRate:   A.baseRate,
+  gasPrice:   A.gasPrice,
+  mpg:        A.mpg
+};
+
+/* ── Calculation engine ── */
+function calc(miles, behaviorKey, efficiency, baseRate, gasPrice, mpg) {
+  const totalKwh = miles / efficiency;
+  const pct      = behaviorKey === 'optimal' ? 1.0 : A.savingsTiers[behaviorKey].pct;
+
+  /* ChargeSmart monthly savings vs standard rate:
+     off-peak credit (overnight kWh × rate) + enrollment credit
+     The overnight kWh earns a credit; daytime kWh earns nothing extra.
+     Net saving = (pct × totalKwh × offPeakCreditRate) + enrollmentCredit */
+  const offPeakCredit  = r2(pct * totalKwh * A.offPeakCreditRate);
+  const enrollCredit   = A.enrollmentCredit;
+  const monthlySaving  = r2(offPeakCredit + enrollCredit);
+  const annualSaving   = Math.round(monthlySaving * 12);
+
+  /* Standard EV charging cost (no ChargeSmart) */
+  const evStdCost = r2(totalKwh * baseRate);
+  /* EV cost with ChargeSmart */
+  const evCsCost  = r2(evStdCost - monthlySaving);
+
+  /* Gas cost */
+  const gasCost   = r2((miles / mpg) * gasPrice);
+
+  /* Total vs gas with ChargeSmart */
+  const totalVsGas = r2(gasCost - evCsCost);
+
+  return {
+    totalKwh,
+    offPeakCredit,
+    enrollCredit,
+    monthlySaving,
+    annualSaving,
+    evStdCost,
+    evCsCost,
+    gasCost,
+    totalVsGas
+  };
+}
+
+function r2(n)   { return Math.round(n * 100) / 100; }
+function fmt(n)  { return '$' + Math.abs(n).toFixed(2); }
+function fmtA(n) { return '$' + Math.abs(Math.round(n)).toLocaleString(); }
+function fmtS(n) { return (n >= 0 ? '+' : '−') + '$' + Math.abs(n).toFixed(2); }
+
+/* ── Update UI ── */
+function updateUI() {
+  const r      = calc(state.miles, state.behavior, state.efficiency, state.baseRate, state.gasPrice, state.mpg);
+  const bestR  = calc(state.miles, 'optimized', state.efficiency, state.baseRate, state.gasPrice, state.mpg);
+  const midR   = calc(state.miles, 'mixed',     state.efficiency, state.baseRate, state.gasPrice, state.mpg);
+  const worstR = calc(state.miles, 'poor',      state.efficiency, state.baseRate, state.gasPrice, state.mpg);
+
+  /* Grade — inject dynamic savings into subtitle */
+  const g = GRADES[state.behavior];
+  document.getElementById('gradeBanner').className = 'grade-banner ' + g.bgClass;
+  const badge = document.getElementById('gradeBadge');
+  badge.className = 'grade-badge ' + g.badgeClass;
+  badge.textContent = g.letter;
+  document.getElementById('gradeTitle').textContent = g.title;
+  const extraSavings = r2(bestR.monthlySaving - r.monthlySaving);
+  const subtitle = g.subtitle.replace('$X', fmt(extraSavings));
+  document.getElementById('gradeSubtitle').textContent = subtitle;
+  document.getElementById('gradeNudge').textContent    = g.nudge;
+
+  /* ChargeSmart breakdown */
+  document.getElementById('offpeakCredit').textContent = '+ ' + fmt(r.offPeakCredit);
+  document.getElementById('stdCost').textContent       = fmt(r.evStdCost) + '/mo';
+  document.getElementById('totalMonthly').textContent  = fmt(r.monthlySaving);
+  document.getElementById('totalAnnual').textContent   = fmtA(r.annualSaving) + '/yr';
+
+  const savEl = document.getElementById('savingsLine');
+  savEl.textContent = 'saved vs. standard rate each month';
+  savEl.className = 'result-savings-line positive';
+
+  document.getElementById('inlineCTAText').innerHTML = CTA_COPY[state.behavior];
+
+  /* Gas vs EV */
+  document.getElementById('gasCost').textContent    = fmt(r.gasCost);
+  document.getElementById('evStdCost').textContent  = fmt(r.evStdCost);
+  document.getElementById('evCsCost').textContent   = fmt(r.evCsCost);
+  document.getElementById('totalVsGas').textContent = '+' + fmt(r.totalVsGas);
+
+  const gasEvNote = document.getElementById('gasEvNote');
+  const gasSavings = r2(r.gasCost - r.evStdCost);
+  gasEvNote.textContent = 'Driving electric saves you ' + fmt(gasSavings) + '/month on fuel. ChargeSmart adds another ' + fmt(r.monthlySaving) + ' on top — that\'s ' + fmt(r.totalVsGas) + '/month total vs. gas.';
+
+
+  /* Motivators */
+  const annualBest = bestR.annualSaving;
+  document.getElementById('motivAnnual').textContent = fmtA(annualBest);
+  const freeMonths = (annualBest / r.evStdCost).toFixed(1);
+  document.getElementById('motivEquiv').textContent = "That's roughly " + freeMonths + " free months of EV charging per year.";
+
+  const yr5best  = Math.round(bestR.monthlySaving * 60);
+  const yr5worst = Math.round(worstR.monthlySaving * 60);
+  document.getElementById('motiv5yr').textContent     = fmtA(yr5best);
+  document.getElementById('motiv5yrEquiv').textContent = 'vs. ' + fmtA(yr5worst) + ' with mostly daytime charging over the same period.';
+
+  const yr5gas = Math.round((r.gasCost - r.evCsCost) * 60);
+  document.getElementById('motiv5yrGas').textContent   = fmtA(yr5gas);
+  document.getElementById('motivGasEquiv').textContent = 'Based on ' + fmt(r.gasPrice || state.gasPrice) + '/gal gas and ' + state.miles.toLocaleString() + ' miles/month for 5 years.';
+
+  /* Scenarios */
+  document.getElementById('scenBestCost').textContent    = fmt(bestR.monthlySaving);
+  document.getElementById('scenBestAnnual').textContent  = fmtA(bestR.annualSaving) + '/year';
+  document.getElementById('scenBestExtra').textContent   = '';
+
+  document.getElementById('scenMidCost').textContent     = fmt(midR.monthlySaving);
+  document.getElementById('scenMidAnnual').textContent   = fmtA(midR.annualSaving) + '/year';
+  const midGap = r2(bestR.monthlySaving - midR.monthlySaving);
+  document.getElementById('scenMidExtra').textContent    = 'Switching to overnight saves ' + fmt(midGap) + ' more/month';
+
+  document.getElementById('scenWorstCost').textContent   = fmt(worstR.monthlySaving);
+  document.getElementById('scenWorstAnnual').textContent = fmtA(worstR.annualSaving) + '/year';
+  const worstGap = r2(bestR.monthlySaving - worstR.monthlySaving);
+  document.getElementById('scenWorstExtra').textContent  = 'Switching to overnight saves ' + fmt(worstGap) + ' more/month';
+
+  /* Bar widths — proportional to savings */
+  const maxS = Math.max(bestR.monthlySaving, 0.01);
+  document.getElementById('scenBestBar').style.width  = '100%';
+  document.getElementById('scenMidBar').style.width   = Math.max((midR.monthlySaving  / maxS) * 100, 6).toFixed(0) + '%';
+  document.getElementById('scenWorstBar').style.width = Math.max((worstR.monthlySaving / maxS) * 100, 6).toFixed(0) + '%';
+
+  /* Active scenario highlight */
+  ['scenBest','scenMid','scenWorst'].forEach(id => {
+    document.getElementById(id).classList.remove('active-scenario');
+    const t = document.getElementById(id).querySelector('.current-you-tag');
+    if (t) t.remove();
+  });
+  const activeMap = { optimized: 'scenBest', mixed: 'scenMid', poor: 'scenWorst' };
+  const activeCard = document.getElementById(activeMap[state.behavior]);
+  if (activeCard) {
+    activeCard.classList.add('active-scenario');
+    const tag = document.createElement('div');
+    tag.className = 'current-you-tag';
+    tag.textContent = 'You';
+    activeCard.appendChild(tag);
+  }
+
+  const lbls = { optimized: 'Mostly overnight (Grade A)', mixed: 'Day & night mix (Grade C)', poor: 'Mostly daytime (Grade D)' };
+  document.getElementById('youAreHereText').textContent =
+    'Your selection: "' + lbls[state.behavior] + '" — saving ' + fmt(r.monthlySaving) + '/month · ' + fmtA(r.annualSaving) + '/year with ChargeSmart.';
+}
+
+/* ── Screen switching ── */
+function showScreen(name) {
+  var screens = {
+    calculator: CALC_HTML,
+    messages:   MSG_HTML
+  };
+  var idMap = { calculator: 'tab-calc', messages: 'tab-msg' };
+  document.getElementById('main-content').innerHTML = screens[name] || '';
+  document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active-tab'); });
+  var el = document.getElementById(idMap[name]);
+  if (el) el.classList.add('active-tab');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  document.getElementById('progressBar').style.width = '0%';
+  if (name === 'calculator') {
+    bindCalcEvents();
+    updateUI();
+  }
+};
+
+
+function bindCalcEvents() {
+  // Guard: don't double-bind
+  if (document.getElementById('milesSlider')._bound) return;
+  document.getElementById('milesSlider')._bound = true;
+
+/* ── Event listeners ── */
+document.getElementById('milesSlider').addEventListener('input', function() {
+  state.miles = parseInt(this.value);
+  document.getElementById('milesDisplay').textContent = parseInt(this.value).toLocaleString() + ' mi';
+  updateUI();
+});
+
+document.querySelectorAll('.behavior-option').forEach(function(opt) {
+  opt.addEventListener('click', function() {
+    state.behavior = this.dataset.behavior;
+    document.querySelectorAll('.behavior-option').forEach(o => { o.className = 'behavior-option'; });
+    const cMap = { optimized: 'sel-blue', mixed: 'sel-amber', poor: 'sel-orange' };
+    this.classList.add(cMap[state.behavior]);
+    updateUI();
+  });
+});
+
+document.getElementById('gasPrice').addEventListener('input', function() {
+  const v = parseFloat(this.value); if (!isNaN(v) && v > 0) { state.gasPrice = v; updateUI(); }
+});
+document.getElementById('mpg').addEventListener('input', function() {
+  const v = parseFloat(this.value); if (!isNaN(v) && v > 0) { state.mpg = v; updateUI(); }
+});
+document.getElementById('efficiency').addEventListener('input', function() {
+  const v = parseFloat(this.value); if (!isNaN(v) && v > 0) { state.efficiency = v; updateUI(); }
+});
+document.getElementById('baseRate').addEventListener('input', function() {
+  const v = parseFloat(this.value); if (!isNaN(v) && v > 0) { state.baseRate = v; updateUI(); }
+});
+
+function toggleAdvanced() {
+  document.getElementById('advancedPanel').classList.toggle('open');
+  document.getElementById('advancedToggle').classList.toggle('open');
+}
+
+window.addEventListener('scroll', function() {
+  const st = document.documentElement.scrollTop || document.body.scrollTop;
+  const sh = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+  document.getElementById('progressBar').style.width = (sh > 0 ? (st/sh)*100 : 0).toFixed(1) + '%';
+});
+
+  updateUI();
+}
+
+// Initial render
+document.addEventListener('DOMContentLoaded', function() {
+  showScreen('calculator');
+});
+</script>
+</body>
+</html>
